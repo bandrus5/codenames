@@ -22,7 +22,7 @@ for image_file in all_image_files:
         card_data.append(next_data.split())
     first_turn = ''
     while first_turn.lower() not in ['red', 'blue']:
-        first_turn = input('Whose turn is next? ')
+        first_turn = input('Whose turn is first? ')
     for label in ['First', 'Second', 'Third', 'Fourth', 'Fifth']:
         next_data = input(f'{label} key row: ')
         while len(next_data.split()) != 5:
