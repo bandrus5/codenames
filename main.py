@@ -31,6 +31,9 @@ if __name__ == '__main__':
                         default='display',
                         help='Which analyzer to use for extracting game state from images')
 
+    parser.add_argument('-v', '--verbose',
+                        action='store_true')
+
     flags, _ = parser.parse_known_args()
 
     dataset: BundleSet = get_data(flags.background, flags.difficulty, flags.input_set)
@@ -38,7 +41,7 @@ if __name__ == '__main__':
     if flags.processor.lower() == 'berkeley':
         image_processor = None
     elif flags.processor.lower() == 'ryan':
-        image_processor = RyanImageProcessor()
+        image_processor = RyanImageProcessor(is_verbose=flags.verbose)
     elif flags.processor.lower() == 'duncan':
         image_processor = None
     else:
@@ -59,4 +62,4 @@ if __name__ == '__main__':
         print_game_state(image_bundle['label'])
         print('---Predicted Game State---')
         print_game_state(game_state)
-        display_image(image_bundle['image'])
+        display_image(image_bundle['image'], 1000)

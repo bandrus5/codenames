@@ -24,8 +24,8 @@ def resize_image(
     return cv2.resize(image, dim)
 
 
-def display_image(image: np.ndarray):
-    sized_image = resize_image(image, width=600)
+def display_image(image: np.ndarray, width: int = 600):
+    sized_image = resize_image(image, width=width)
     cv2.imshow("image", sized_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
