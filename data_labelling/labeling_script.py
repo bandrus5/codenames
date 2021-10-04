@@ -1,5 +1,6 @@
 from glob import glob
 import json
+from game_state import *
 
 
 dataset = 'test'
@@ -11,8 +12,8 @@ for image_file in all_image_files:
     if image_file.replace('jpg', 'json') in all_label_files:
         continue
     print(image_file.split('/')[-1])
-    card_data = []
-    key_data = []
+    card_data: CardState = []
+    key_data: KeyState = []
 
     for label in ['First', 'Second', 'Third', 'Fourth', 'Fifth']:
         next_data = input(f'{label} card row: ')
@@ -31,5 +32,5 @@ for image_file in all_image_files:
         key_data.append(next_data.split())
 
     with open(image_file.replace('jpg', 'json'), 'w') as out_file:
-        obj = {'cards': card_data, 'first_turn': first_turn, 'key': key_data}
+        obj: GameState = {'cards': card_data, 'first_turn': first_turn, 'key': key_data}
         json.dump(obj, out_file)
