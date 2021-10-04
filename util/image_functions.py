@@ -1,6 +1,12 @@
 import cv2
+import numpy as np
 
-def resize_image(image, width=None, height=None, keep_aspect_ratio=True):
+
+def resize_image(
+        image: np.ndarray,
+        width: int = None,
+        height: int = None,
+        keep_aspect_ratio: bool = True) -> np.ndarray:
     if not keep_aspect_ratio and all([width, height]):
         return cv2.resize(image, (width, height))
 
@@ -18,7 +24,7 @@ def resize_image(image, width=None, height=None, keep_aspect_ratio=True):
     return cv2.resize(image, dim)
 
 
-def display_image(image):
+def display_image(image: np.ndarray):
     sized_image = resize_image(image, width=600)
     cv2.imshow("image", sized_image)
     cv2.waitKey(0)
