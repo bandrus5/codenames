@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     for image_bundle in dataset:
         if image_processor is not None:
-            game_state: Union[GameState, None] = image_processor.extract_state_from_image(image_bundle['image'])
+            game_state: Optional[GameState] = image_processor.extract_state_from_image(image_bundle['image'])
         else:
             game_state = None
 
@@ -57,7 +57,6 @@ if __name__ == '__main__':
         print(image_bundle['name'])
         print('---Expected Game State---')
         print_game_state(image_bundle['label'])
-        if game_state is not None:
-            print('---Predicted Game State---')
-            print_game_state(game_state)
+        print('---Predicted Game State---')
+        print_game_state(game_state)
         display_image(image_bundle['image'])

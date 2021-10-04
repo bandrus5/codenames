@@ -3,5 +3,5 @@ from data_labelling.game_state import *
 
 
 class ImageProcessorInterface:
-    def extract_state_from_image(self, input_image: np.ndarray) -> GameState:
+    def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
         pass

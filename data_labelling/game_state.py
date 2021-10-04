@@ -6,9 +6,9 @@ KeyState = List[List[str]]
 
 
 class GameState(TypedDict):
-    cards: CardState
-    first_turn: str
-    key: KeyState
+    cards: Optional[CardState]
+    first_turn: Optional[str]
+    key: Optional[KeyState]
 
 
 __color_map = {'r': Fore.RED,
@@ -31,10 +31,21 @@ def get_formatted_row(row: List[str], width: int) -> str:
     return output
 
 
-def print_game_state(game_state: GameState):
-    first_turn = game_state['first_turn']
-    print(f'Turn: {first_turn}')
-    for card_row in game_state['cards']:
-        print(get_formatted_row(card_row, 14))
-    for key_row in game_state['key']:
-        print(get_formatted_row(key_row, 2))
+def print_game_state(game_state: Optional[GameState]):
+    if game_state is None:
+        print("No GameState")
+    else:
+        first_turn = game_state.get('first_turn')
+        print(f'Turn: {first_turn}')
+        cards = game_state.get('cards')
+        if cards is not None:
+            for card_row in cards:
+                print(get_formatted_row(card_row, 14))
+        else:
+            print('No cards')
+        key = game_state.get('key')
+        if key is not None:
+            for key_row in key:
+                print(get_formatted_row(key_row, 2))
+        else:
+            print('No key')
