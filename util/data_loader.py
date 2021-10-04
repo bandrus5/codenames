@@ -1,4 +1,4 @@
-import cv2
+from cv2 import cv2
 from glob import glob
 import json
 import os
