@@ -13,4 +13,4 @@ class ImageProcessorInterface:
 
     def verbose_display(self, image):
         if self.is_verbose:
-            display_image(image, self.verbose_display_size)
+            display_image(image, self.verbose_display_size, self.verbose_display_size)
