@@ -11,6 +11,13 @@ class ImageProcessorInterface:
     def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
         pass
 
-    def verbose_display(self, image):
+    def verbose_display(self, images_to_display: List[np.ndarray]):
         if self.is_verbose:
-            display_image(image, self.verbose_display_size, self.verbose_display_size)
+            reshaped_imgs = []
+            for image in images_to_display:
+                reshaped = image.reshape((image.shape[0], image.shape[1], -1))
+                if reshaped.shape[2] < 3:
+                    reshaped = np.concatenate([reshaped] * 3, axis=2)
+                reshaped_imgs.append(reshaped)
+            combined_img = np.concatenate(reshaped_imgs, axis=1)
+            display_image(combined_img, width=self.verbose_display_size * len(images_to_display))
