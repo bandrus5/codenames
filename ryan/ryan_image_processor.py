@@ -8,22 +8,24 @@ from util.image_functions import draw_hough_line_segments
 
 class RyanImageProcessor(ImageProcessorInterface):
     kernel = np.ones((3, 3), dtype=np.uint8)
-    # red_card_color = np.array([10, 100, 200])
-    red_card_color = np.array([0, 0, 255])
-    blue_card_color = np.array([255, 0, 0])
-    # blue_card_color = np.array([140, 70, 0])
+    red_card_color = np.array([15, 50, 180])
+    # red_card_color = np.array([0, 0, 255])
+    blue_card_color = np.array([100, 60, 30])
+    # blue_card_color = np.array([255, 0, 0])
+    # yellow_card_color = np.array([130, 160, 190])
+    yellow_card_color = np.array([180, 190, 190])
     # yellow_card_color = np.array([0, 255, 255])
-    yellow_card_color = np.array([70, 130, 170])
 
 
     def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
         resized_img = input_image
+        blurred_img = cv2.GaussianBlur(resized_img, (9, 9), 0)
         # resized_img = resize_image(input_image, width=1000, height=1000)
-        balanced_img = self._color_correct(resized_img)
+        # balanced_img = self._color_correct(blurred_img)
+        balanced_img = blurred_img
         red_img = self._select_color(balanced_img, self.red_card_color)
         blue_img = self._select_color(balanced_img, self.blue_card_color)
         yellow_img = self._select_color(balanced_img, self.yellow_card_color)
-        self.verbose_display([red_img, blue_img, yellow_img, resized_img])
         # gray_img = self._distance_from_color(resized_img, self.blue_card_color)
         # gray_img = resized_img[:, :, 2]
         # self.verbose_display(gray_img)
@@ -50,28 +52,50 @@ class RyanImageProcessor(ImageProcessorInterface):
         return GameState(cards=None, key=None, first_turn=None)
 
     def _select_color(self, input_img, color):
-        distance_img = self._distance_from_color(input_img, color)
-        _, threshold_img = cv2.threshold(distance_img, 100, 255, cv2.THRESH_BINARY)
+        hue_weight = 3
+        saturation_weight = 2
+        value_weight = 1
+        total_weight = hue_weight + saturation_weight + value_weight
+        hue_distance_img = self._distance_from_color_in_channel(input_img, color, 'h')
+        saturation_distance_img = self._distance_from_color_in_channel(input_img, color, 's')
+        value_distance_img = self._distance_from_color_in_channel(input_img, color, 'v')
+        distance_img = (hue_weight * hue_distance_img +
+                        saturation_weight * saturation_distance_img +
+                        value_weight * value_distance_img) / total_weight
+        # self.verbose_display([hue_distance_img, saturation_distance_img, value_distance_img, distance_img, input_img], 256)
+        distance_img = (distance_img * 255).astype(np.uint8)
+        _, threshold_img = cv2.threshold(distance_img, 200, 255, cv2.THRESH_BINARY)
+        self.verbose_display([threshold_img, input_img])
         return threshold_img
 
-    def _distance_from_color(self, input_img, color):
+    def _channel_from_channel_name(self, channel_name: str):
+        channel = 0
+        if channel_name == 'h' or channel_name == 'hue':
+            channel = 0
+        elif channel_name == 's' or channel_name == 'saturation':
+            channel = 1
+        elif channel_name == 'v' or channel_name == 'value':
+            channel = 2
+        return channel
+
+    def _distance_from_color_in_channel(self, input_img: np.ndarray, color: np.ndarray, channel_name: str = 'h'):
+        channel = self._channel_from_channel_name(channel_name)
         h, w = input_img.shape[:2]
         conversion = cv2.COLOR_BGR2HSV
         converted_img = cv2.cvtColor(input_img.astype(np.uint8), conversion).astype(np.float32)
-        converted_color = cv2.cvtColor(color.reshape(1, 1, 3).astype(np.uint8), conversion).astype(np.float32)
-        difference_img = (converted_img[:, :, 0] - converted_color[:, :, 0]).reshape(h, w, -1)
+        converted_color = cv2.cvtColor(color.reshape((1, 1, 3)).astype(np.uint8), conversion).astype(np.float32)
+        difference_img = (converted_img[:, :, channel] - converted_color[:, :, channel]).reshape(h, w, -1)
 
         difference_img = np.abs(difference_img)
-        if conversion == cv2.COLOR_BGR2HSV:
+        if conversion == cv2.COLOR_BGR2HSV and channel == 0:
             difference_img = np.minimum(difference_img, 180 - difference_img)
-        distance_img = np.linalg.norm(difference_img, axis=2)
+        distance_img = difference_img
         distance_img = distance_img / np.max(distance_img)
         distance_img = 1 - distance_img
-        distance_img = (255 * distance_img).astype(np.uint8)
         return distance_img
 
     def _color_correct(self, input_img):
-        wb = cv2.xphoto.createGrayworldWB()
+        wb = cv2.xphoto.createSimpleWB()
         balanced_img = wb.balanceWhite(input_img)
         self.verbose_display([balanced_img, input_img])
         return balanced_img
