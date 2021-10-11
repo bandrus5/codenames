@@ -1,6 +1,7 @@
 from util.data_loader import *
 from util.image_functions import display_image
 from ryan.ryan_image_processor import RyanImageProcessor
+from berkeley.berkeley_image_processor import BerkeleyImageProcessor
 import colorama
 import argparse
 
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     dataset: BundleSet = get_data(flags.background, flags.difficulty, flags.input_set)
 
     if flags.processor.lower() == 'berkeley':
-        image_processor = None
+        image_processor = BerkeleyImageProcessor()
     elif flags.processor.lower() == 'ryan':
         image_processor = RyanImageProcessor(is_verbose=flags.verbose)
     elif flags.processor.lower() == 'duncan':
