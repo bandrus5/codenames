@@ -1,6 +1,7 @@
 from cv2 import cv2
 import numpy as np
 from typing import *
+import os
 
 
 def _calculate_final_size(
@@ -50,6 +51,13 @@ def display_image(image: np.ndarray, width: int = 600, height: int = 600):
     cv2.imshow("image", sized_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def save_image(image: np.ndarray, location: str):
+    if not os.path.exists(os.path.dirname(location)):
+        print(f'{os.path.dirname(location)} does not exist, creating directory')
+        os.makedirs(os.path.dirname(location))
+    cv2.imwrite(location, image)
 
 
 def draw_hough_line_segments(image: np.ndarray, lines: np.ndarray) -> np.ndarray:
