@@ -40,7 +40,7 @@ if __name__ == '__main__':
     dataset: BundleSet = get_data(flags.background, flags.difficulty, flags.input_set)
 
     if flags.processor.lower() == 'berkeley':
-        image_processor = BerkeleyImageProcessor()
+        image_processor = BerkeleyImageProcessor(flags=flags)
     elif flags.processor.lower() == 'ryan':
         image_processor = RyanImageProcessor(is_verbose=flags.verbose)
     elif flags.processor.lower() == 'duncan':
