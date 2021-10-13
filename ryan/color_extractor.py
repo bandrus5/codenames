@@ -1,11 +1,12 @@
 import numpy as np
 from cv2 import cv2
 import numpy.typing as npt
+from util.type_defs import *
 
 
 class ColorExtractor:
     @staticmethod
-    def extract_color(input_img: npt.NDArray[np.uint8], color: npt.NDArray[np.uint8], threshold: int, use_only_value: bool = False):
+    def extract_color(input_img: Int2D_3C, color: Color, threshold: int, use_only_value: bool = False) -> Int2D_1C:
         if use_only_value:
             hue_weight = 0
             saturation_weight = 0
@@ -45,13 +46,13 @@ class ColorExtractor:
         return channel
 
     @staticmethod
-    def _distance_from_color_in_channel(input_img: np.ndarray, color: np.ndarray, channel_name: str = 'h'):
+    def _distance_from_color_in_channel(input_img: Int2D_3C, color: Color, channel_name: str = 'h') -> Float2D_1C:
         channel = ColorExtractor._channel_from_channel_name(channel_name)
         h, w = input_img.shape[:2]
         conversion = cv2.COLOR_BGR2HSV
         converted_img = cv2.cvtColor(input_img.astype(np.uint8), conversion).astype(np.float32)
         converted_color = cv2.cvtColor(color.reshape((1, 1, 3)).astype(np.uint8), conversion).astype(np.float32)
-        difference_img = (converted_img[:, :, channel] - converted_color[:, :, channel]).reshape(h, w, -1)
+        difference_img = (converted_img[:, :, channel] - converted_color[:, :, channel])
 
         difference_img = np.abs(difference_img)
         if conversion == cv2.COLOR_BGR2HSV and channel == 0:

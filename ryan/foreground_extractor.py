@@ -1,11 +1,12 @@
 import numpy as np
 from typing import *
 from cv2 import cv2
+from util.type_defs import *
 
 
 class ForegroundExtractor:
     @staticmethod
-    def extract_foreground(input_img: np.ndarray, background_margin: int) -> Tuple[np.ndarray, np.ndarray]:
+    def extract_foreground(input_img: Int2D_3C, background_margin: int) -> Tuple[Int2D_1C, Int2D_3C]:
         h, w = input_img.shape[:2]
         mask = np.zeros(input_img.shape[:2], dtype=np.uint8)
         bg_model = np.zeros((1, 65), np.float64)
