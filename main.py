@@ -43,7 +43,7 @@ if __name__ == '__main__':
     util.image_functions.is_verbose = flags.verbose
 
     if flags.processor.lower() == 'berkeley':
-        image_processor = BerkeleyImageProcessor()
+        image_processor = BerkeleyImageProcessor(flags=flags)
     elif flags.processor.lower() == 'ryan':
         image_processor = RyanImageProcessor()
     elif flags.processor.lower() == 'duncan':
