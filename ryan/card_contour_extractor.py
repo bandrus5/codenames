@@ -67,6 +67,24 @@ class CardContourExtractor:
         epsilon = max_difference * cv2.arcLength(contour, True)
         simplified_contour = cv2.approxPolyDP(contour, epsilon, True)
         return simplified_contour
+    @staticmethod
+    def _display_contours(input_img: Int2D_3C, contours: List[Contour], display_all_at_once: bool = True):
+        if display_all_at_once:
+            background_img = input_img.copy()
+            for i, contour in enumerate(contours):
+                if not display_all_at_once:
+                    background_img = input_img.copy()
+                    line_count = contour.shape[0]
+                    similarity = CardContourExtractor._get_contour_card_similarity(contour)
+                    area = cv2.contourArea(contour)
+                    print(f"{i} - Count: {line_count:3} Similarity: {similarity:.5f} Area: {area:.2f}")
+                cv2.drawContours(background_img, [contour], -1, (0, 255, 0), 2)
+                if not display_all_at_once:
+                    verbose_display([background_img])
+            if display_all_at_once:
+                verbose_display([background_img])
+
+
 
     @staticmethod
     def _get_contour_card_similarity(contour: Contour) -> float:
