@@ -50,14 +50,21 @@ def resize_image(
     return cv2.resize(image, dim, interpolation=interpolation)
 
 
+def convert_to_Int2D_3C(image: Union[Int2D_1C, Int2D_3C, Float2D_1C, Float2D_3C]) -> Int2D_3C:
+    converted_img = image.reshape((image.shape[0], image.shape[1], -1))
+    if converted_img.shape[2] < 3:
+        converted_img = np.concatenate([converted_img] * 3, axis=2)
+    if converted_img.dtype != np.uint8:
+        converted_img = (converted_img * 255).astype(np.uint8)
+    return converted_img
+
+
 def combine_images(images: List[Union[Int2D_1C, Int2D_3C, Float2D_3C, Float2D_1C]], image_width: int) -> Int2D_3C:
+    if not isinstance(images, List):
+        images = [images]
     reshaped_imgs = []
     for image in images:
-        reshaped = image.reshape((image.shape[0], image.shape[1], -1))
-        if reshaped.shape[2] < 3:
-            reshaped = np.concatenate([reshaped] * 3, axis=2)
-        if reshaped.dtype != np.uint8:
-            reshaped = (reshaped * 255).astype(np.uint8)
+        reshaped = convert_to_Int2D_3C(image)
         reshaped = resize_image(reshaped, width=image_width)
         reshaped_imgs.append(reshaped)
     max_height = 0
@@ -94,12 +101,14 @@ def save_image(image: np.ndarray, location: str):
     cv2.imwrite(location, image)
 
 
-def draw_hough_line_segments(image: Int2D_3C, lines: np.ndarray) -> Int2D_3C:
+def draw_hough_line_segments(image: Union[Int2D_3C, Int2D_1C], lines: np.ndarray, color: Color = np.array([0, 0, 255])) -> Int2D_3C:
     line_image = image.copy()
+    line_image = convert_to_Int2D_3C(line_image)
+    color = color.tolist()
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
-            cv2.line(line_image, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.line(line_image, (x1, y1), (x2, y2), color, 1)
     return line_image
 
 
