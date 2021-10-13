@@ -2,6 +2,7 @@ from cv2 import cv2
 import numpy as np
 from typing import *
 import os
+from util.type_defs import *
 from matplotlib import pyplot as plt
 
 is_verbose = False
@@ -49,7 +50,7 @@ def resize_image(
     return cv2.resize(image, dim, interpolation=interpolation)
 
 
-def combine_images(images: List[np.ndarray], image_width: int) -> np.ndarray:
+def combine_images(images: List[Union[Int2D_1C, Int2D_3C, Float2D_3C, Float2D_1C]], image_width: int) -> Int2D_3C:
     reshaped_imgs = []
     for image in images:
         reshaped = image.reshape((image.shape[0], image.shape[1], -1))
@@ -79,7 +80,7 @@ def display_image(image: np.ndarray, width: int = 600, height: int = 600):
     cv2.destroyAllWindows()
 
 
-def verbose_display(images_to_display: List[np.ndarray], display_size: int = None):
+def verbose_display(images_to_display: List[Union[Int2D_1C, Int2D_3C, Float2D_3C, Float2D_1C]], display_size: int = None):
     if is_verbose:
         combined_img = combine_images(images_to_display, display_size)
         display_image(combined_img, width=display_size * len(images_to_display))
@@ -92,7 +93,7 @@ def save_image(image: np.ndarray, location: str):
     cv2.imwrite(location, image)
 
 
-def draw_hough_line_segments(image: np.ndarray, lines: np.ndarray) -> np.ndarray:
+def draw_hough_line_segments(image: Int2D_3C, lines: np.ndarray) -> Int2D_3C:
     line_image = image.copy()
     if lines is not None:
         for line in lines:
@@ -101,7 +102,8 @@ def draw_hough_line_segments(image: np.ndarray, lines: np.ndarray) -> np.ndarray
     return line_image
 
 
-def _draw_histogram_channel(histogram_img: np.ndarray, histogram_for_channel: np.ndarray, color: List[int], max_value: float):
+def _draw_histogram_channel(histogram_img: Int2D_3C, histogram_for_channel: Float1D, color: Color, max_value: float):
+    color = color.tolist()
     h, w = histogram_img.shape[:2]
     multiplier = h / max_value
     for i in range(1, w):
@@ -110,7 +112,7 @@ def _draw_histogram_channel(histogram_img: np.ndarray, histogram_for_channel: np
         cv2.line(histogram_img, pt1, pt2, color, thickness=1)
 
 
-def draw_histogram(histogram: List[np.ndarray]) -> np.ndarray:
+def draw_histogram(histogram: Histogram) -> Int2D_3C:
     bin_count = histogram[0].shape[0]
     histogram_height = bin_count
     histogram_img = np.zeros((histogram_height, bin_count, 3), dtype=np.uint8)
@@ -119,7 +121,7 @@ def draw_histogram(histogram: List[np.ndarray]) -> np.ndarray:
         max_value = np.maximum(max_value, np.max(histogram[channel]))
 
     for channel in range(3):
-        color = [0, 0, 0]
+        color = np.array([0, 0, 0], dtype=np.uint8)
         color[channel] += 255
         _draw_histogram_channel(histogram_img, histogram[channel], color, max_value)
     return histogram_img

@@ -9,6 +9,7 @@ from ryan.card_contour_extractor import CardContourExtractor
 from ryan.color_corrector import  ColorCorrector
 from util.image_functions import resize_image
 from util.image_functions import *
+from util.type_defs import *
 
 
 class RyanImageProcessor(ImageProcessorInterface):
@@ -23,7 +24,7 @@ class RyanImageProcessor(ImageProcessorInterface):
 
     # yellow_card_color = np.array([0, 255, 255])
 
-    def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
+    def extract_state_from_image(self, input_image: Int2D_3C) -> Optional[GameState]:
         resized_size = 1000
         resized_img = resize_image(input_image, width=resized_size, height=resized_size)
         blurred_img = cv2.GaussianBlur(resized_img, (9, 9), 0)
@@ -65,7 +66,7 @@ class RyanImageProcessor(ImageProcessorInterface):
         #     approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
         return GameState(cards=None, key=None, first_turn=None)
 
-    def _filter_color(self, color_img: npt.NDArray[np.uint8], original_img: npt.NDArray[np.uint8]):
+    def _filter_color(self, color_img: Int2D_1C, original_img: Int2D_3C):
         erode_img = cv2.erode(color_img, None, iterations=3)
         dilate_img = cv2.dilate(erode_img, None, iterations=3)
         contours = CardContourExtractor.extract_card_contours(dilate_img, original_img)
