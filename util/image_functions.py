@@ -2,6 +2,9 @@ from cv2 import cv2
 import numpy as np
 from typing import *
 import os
+from matplotlib import pyplot as plt
+
+is_verbose = False
 
 
 def _calculate_final_size(
@@ -46,11 +49,40 @@ def resize_image(
     return cv2.resize(image, dim, interpolation=interpolation)
 
 
+def combine_images(images: List[np.ndarray], image_width: int) -> np.ndarray:
+    reshaped_imgs = []
+    for image in images:
+        reshaped = image.reshape((image.shape[0], image.shape[1], -1))
+        if reshaped.shape[2] < 3:
+            reshaped = np.concatenate([reshaped] * 3, axis=2)
+        if reshaped.dtype != np.uint8:
+            reshaped = (reshaped * 255).astype(np.uint8)
+        reshaped = resize_image(reshaped, width=image_width)
+        reshaped_imgs.append(reshaped)
+    max_height = 0
+    for image in reshaped_imgs:
+        max_height = np.maximum(max_height, image.shape[0])
+    padded_imgs = []
+    for image in reshaped_imgs:
+        padding = (max_height - image.shape[0]) / 2
+        image = cv2.copyMakeBorder(image, int(np.ceil(padding)), int(np.floor(padding)), 0, 0, cv2.BORDER_CONSTANT,
+                                   (0, 0, 0))
+        padded_imgs.append(image)
+    combined_img = np.concatenate(padded_imgs, axis=1)
+    return combined_img
+
+
 def display_image(image: np.ndarray, width: int = 600, height: int = 600):
     sized_image = resize_image(image, width=width, height=height)
     cv2.imshow("image", sized_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def verbose_display(images_to_display: List[np.ndarray], display_size: int = None):
+    if is_verbose:
+        combined_img = combine_images(images_to_display, display_size)
+        display_image(combined_img, width=display_size * len(images_to_display))
 
 
 def save_image(image: np.ndarray, location: str):
@@ -67,3 +99,27 @@ def draw_hough_line_segments(image: np.ndarray, lines: np.ndarray) -> np.ndarray
             x1, y1, x2, y2 = line[0]
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 0, 255), 2)
     return line_image
+
+
+def _draw_histogram_channel(histogram_img: np.ndarray, histogram_for_channel: np.ndarray, color: List[int], max_value: float):
+    h, w = histogram_img.shape[:2]
+    multiplier = h / max_value
+    for i in range(1, w):
+        pt1 = (i - 1, int(h - multiplier * histogram_for_channel[i - 1]))
+        pt2 = (i, int(h - multiplier * histogram_for_channel[i]))
+        cv2.line(histogram_img, pt1, pt2, color, thickness=1)
+
+
+def draw_histogram(histogram: List[np.ndarray]) -> np.ndarray:
+    bin_count = histogram[0].shape[0]
+    histogram_height = bin_count
+    histogram_img = np.zeros((histogram_height, bin_count, 3), dtype=np.uint8)
+    max_value = 0
+    for channel in range(3):
+        max_value = np.maximum(max_value, np.max(histogram[channel]))
+
+    for channel in range(3):
+        color = [0, 0, 0]
+        color[channel] += 255
+        _draw_histogram_channel(histogram_img, histogram[channel], color, max_value)
+    return histogram_img
