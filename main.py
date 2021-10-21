@@ -1,4 +1,5 @@
 from util.data_loader import *
+import util.image_functions
 from util.image_functions import display_image
 from ryan.ryan_image_processor import RyanImageProcessor
 from berkeley.berkeley_image_processor import BerkeleyImageProcessor
@@ -12,7 +13,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-i', '--input_set',
                         type=str,
-                        choices=['test', 'validation'],
+                        choices=['test', 'validation', 'dark'],
                         default='validation',
                         help='The dataset to process')
 
@@ -39,10 +40,12 @@ if __name__ == '__main__':
 
     dataset: BundleSet = get_data(flags.background, flags.difficulty, flags.input_set)
 
+    util.image_functions.is_verbose = flags.verbose
+
     if flags.processor.lower() == 'berkeley':
         image_processor = BerkeleyImageProcessor(flags=flags)
     elif flags.processor.lower() == 'ryan':
-        image_processor = RyanImageProcessor(is_verbose=flags.verbose)
+        image_processor = RyanImageProcessor()
     elif flags.processor.lower() == 'duncan':
         image_processor = None
     else:
