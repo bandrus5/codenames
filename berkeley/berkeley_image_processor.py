@@ -18,6 +18,7 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         self.kernel = np.ones((5,5),np.uint8)
 
     def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
+        input_image = cv2.resize(input_image, (0,0), fx = 0.5, fy = 0.5)
         red_image_gray = self._simple_color_scale(input_image, 0, True)
         red_image_gray_hc = cv2.convertScaleAbs(red_image_gray, alpha=4.0)
         _, red_image_threshold = cv2.threshold(red_image_gray_hc, 150, 255, cv2.THRESH_BINARY)
@@ -33,11 +34,10 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
 
         if self.difficulty and self.background:
             self._save_image(input_image, f'{self.background}{self.difficulty}truth')
-            self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
+            # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
-
-        self._find_key_grid(input_image, recomposed, recomposed_bw)
+        self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
 
         return GameState(cards=None, key=None, first_turn=None)
 
@@ -71,7 +71,7 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         return new_image
 
 
-    def _find_key_grid_naive_hough(self, input_image, recomposed, recomposed_bw):
+    def _find_key_grid_line_based_hough(self, input_image, recomposed, recomposed_bw):
         contours = cv2.findContours(recomposed_bw.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         shape_centers = []
         for c in contours:
@@ -88,152 +88,125 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             self._save_image(recomposed, f'{self.background}{self.difficulty}contours')
 
         height, width = input_image.shape[:2]
-        votes = np.zeros((height, width))
+
+        angle_votes = np.zeros(180)
+
         for shape_center1 in shape_centers:
             x1, y1 = shape_center1
             for shape_center2 in shape_centers:
                 x2, y2 = shape_center2
-                if (x1 + y1) <= (x2 + y2): # Don't duplicate work
+                if (x1 + y1) > (x2 + y2) or (x1 == x2 and y1 == y2):
                     continue
-                if abs(x2 - x1) > width / 5 or abs(y2 - y1) > height / 5:
-                    continue
+
                 deltaX = x2 - x1
                 deltaY = y2 - y1
-                for i in range(4):
-                    _deltaX = deltaX * i
-                    _deltaY = deltaY * i
-                    if 0 < x2 + _deltaX < width and 0 < y2 + _deltaY < height:
-                        votes[y2 + _deltaY][x2 + _deltaX] += 3
-                        for j in range(-10, 11):
-                            for k in range(-10, 11):
-                                if 0 < x2 + _deltaX + j < width and 0 < y2 + _deltaY + k < height:
-                                    votes[y2 + _deltaY + k][x2 + _deltaX + j] += 1
-                    if 0 < x1 - _deltaX < width and 0 < y1 - _deltaY < height:
-                        votes[y1 - _deltaY][x1 - _deltaX] += 3
-                        for j in range(-10, 11):
-                            for k in range(-10, 11):
-                                if 0 < x1 - _deltaX + j < width and 0 < y1 - _deltaY + k < height:
-                                    votes[y1 - _deltaY + k][x1 - _deltaX + j] += 1
-                perpDeltaX = deltaY
-                perpDeltaY = -deltaX
-                for i in [-4, -3, -2, -1, 1, 2, 3, 4]:
-                    _deltaX = perpDeltaX * i
-                    _deltaY = perpDeltaY * i
-                    if 0 < x2 + _deltaX < width and 0 < y2 + _deltaY < height:
-                        votes[y2 + _deltaY][x2 + _deltaX] += 3
-                        for j in range(-10, 11):
-                            for k in range(-10, 11):
-                                if 0 < x2 + _deltaX + j < width and 0 < y2 + _deltaY + k < height:
-                                    votes[y2 + _deltaY + k][x2 + _deltaX + j] += 1
-                    if 0 < x1 + _deltaX < width and 0 < y1 + _deltaY < height:
-                        votes[y1 + _deltaY][x1 + _deltaX] += 3
-                        for j in range(-10, 11):
-                            for k in range(-10, 11):
-                                if 0 < x1 + _deltaX + j < width and 0 < y1 + _deltaY + k < height:
-                                    votes[y1 + _deltaY + k][x1 + _deltaX + j] += 1
 
-        votes_image = np.zeros((height, width, 3))
-        votes_image[:,:,0] = (votes > 20) * 255
-        votes_image[:,:,1] = (votes > 20) * 255
-        votes_image[:,:,2] = (votes > 20) * 255
-        if self.difficulty and self.background:
-            self._save_image(votes_image, f'{self.background}{self.difficulty}votes')
+                if abs(deltaX) > width / 20 or abs(deltaY) > height / 20:
+                    continue
 
+                if deltaX == 0:
+                    angle_votes[89] += 1
+                    angle_votes[90] += 3
+                    angle_votes[91] += 1
+                else:
+                    projected_angle = round(math.degrees(math.atan2(deltaY, deltaX)))
+                    angle_votes[(projected_angle - 1) % 180] += 1
+                    angle_votes[projected_angle % 180] += 3
+                    angle_votes[(projected_angle + 1) % 180] += 1
 
-    def _find_key_grid_parameterized_hough(self, input_image, recomposed, recomposed_bw):
-        def fuzzy_vote(arr, location, magnitude):
-            if 0 < location < arr.shape[0]:
-                arr[location] += magnitude
-            for i in range(1, magnitude):
-                vote = magnitude - i
-                if 0 < location - i < arr.shape[0]:
-                    arr[location - i] += vote
-                if 0 < location + i < arr.shape[0]:
-                    arr[location + i] += vote
+        first_alignment = np.argmax(angle_votes)
+        for i in range(-40, 41):
+            angle_votes[(first_alignment + i) % 180] = 0
+        second_alignment = np.argmax(angle_votes)
 
-        contours = cv2.findContours(recomposed_bw.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-        shape_centers = []
-        for c in contours:
-            m = cv2.moments(c)
-            try:
-                cX = int(m['m10'] / m['m00'])
-                cY = int(m['m01'] / m['m00'])
-            except ZeroDivisionError:
-                continue
-            shape_centers.append((cX, cY))
-            cv2.drawContours(recomposed, [c], -1, (0, 255, 0), 2)
-            cv2.circle(recomposed, (cX, cY), 7, (255, 255, 255), -1)
-        if self.difficulty and self.background:
-            self._save_image(recomposed, f'{self.background}{self.difficulty}contours')
-        height, width = input_image.shape[:2]
-        height_votes = np.zeros(height)
-        width_votes = np.zeros(width)
-        x_votes = np.zeros(width)
-        y_votes = np.zeros(height)
-        bottom_angle_votes = np.zeros(90)
-        side_angle_votes = np.zeros(90)
+        if first_alignment < second_alignment:
+            second_alignment, first_alignment = first_alignment, second_alignment
+
+        first_alignment_size_votes = np.zeros(min(width, height))
+        second_alignment_size_votes = np.zeros(min(width, height))
+        center_x_votes = np.zeros(width)
+        center_y_votes = np.zeros(height)
         for shape_center1 in shape_centers:
             x1, y1 = shape_center1
             for shape_center2 in shape_centers:
                 x2, y2 = shape_center2
-                if x1 == x2 and y1 == y2:
+                if (x1 + y1) > (x2 + y2) or (x1 == x2 and y1 == y2):
                     continue
-                if y2 > y1:
+
+                deltaX = x2 - x1
+                deltaY = y2 - y1
+
+                if abs(deltaX) > width / 20 or abs(deltaY) > height / 20:
                     continue
-                if abs(x2 - x1) > width / 10 or abs(y2 - y1) > height / 10: # Too far apart, can't be key card
-                    continue
-                for shape_center3 in shape_centers:
-                    x3, y3 = shape_center3
-                    if x3 in [x1, x2] and y3 in [y1, y2]:
-                        continue
-                    if x3 < x2:
-                        continue
-                    if abs(x3 - x2) > width / 10 or abs(y3 - y2) > height / 10:
-                        continue
-                    deltaX1 = x2 - x1
-                    deltaY1 = y2 - y1
-                    deltaX2 = x3 - x2
-                    deltaY2 = y3 - y2
-                    dist1 = round(math.dist(shape_center1, shape_center2))
-                    dist2 = round(math.dist(shape_center2, shape_center3))
-                    projected_height = dist1 * 7
-                    projected_width = dist2 * 7
-                    projected_x_center = round(np.mean([x1, x2, x3]))
-                    projected_y_center = round(np.mean([y1, y2, y3]))
-                    fuzzy_vote(height_votes, projected_height, 20)
-                    fuzzy_vote(width_votes, projected_width, 20)
-                    fuzzy_vote(x_votes, projected_x_center, 20)
-                    fuzzy_vote(y_votes, projected_y_center, 20)
-                    try:
-                        projected_bottom_angle = round(abs(math.atan(deltaY2 / deltaX2)) * 180 / math.pi)
-                        fuzzy_vote(bottom_angle_votes, projected_bottom_angle, 5)
-                        projected_side_angle = round(abs(math.atan(deltaY1 / deltaX1)) * 180 / math.pi)
-                        fuzzy_vote(side_angle_votes, projected_side_angle, 5)
-                    except:
-                        continue # FIXME handle undefined arctans (at denominator == 0)
+                if deltaX == 0:
+                    projected_angle = 90
+                else:
+                    projected_angle = round(math.degrees(math.atan2(deltaY, deltaX)))
+                for delta in range(-3, 4):
+                    if (projected_angle + delta) % 180 == first_alignment:
+                        distance = math.dist(shape_center1, shape_center2)
+                        projected_card_size = round(distance * 7)
+                        projected_center_x = round(np.mean([x1, x2]))
+                        projected_center_y = round(np.mean([y1, y2]))
+                        for i in range(-10, 11):
+                            vote_magnitude = 10 - abs(i)
+                            if 0 < projected_card_size + i < first_alignment_size_votes.shape[0]:
+                                first_alignment_size_votes[projected_card_size + i] += vote_magnitude
+                            if 0 < projected_center_x + i < width:
+                                center_x_votes[projected_center_x + i] += vote_magnitude
+                            if 0 < projected_center_y + i < height:
+                                center_y_votes[projected_center_y + i] += vote_magnitude
 
-        elected_height = np.argmax(height_votes)
-        elected_width = np.argmax(width_votes)
-        elected_x = np.argmax(x_votes)
-        elected_y = np.argmax(y_votes)
-        elected_bottom_angle = np.argmax(bottom_angle_votes)
-        elected_side_angle = np.argmax(side_angle_votes)
+                    if (projected_angle + delta) % 180 == second_alignment:
+                        distance = math.dist(shape_center1, shape_center2)
+                        projected_card_size = round(distance * 7)
+                        projected_center_x = round(np.mean([x1, x2]))
+                        projected_center_y = round(np.mean([y1, y2]))
+                        for i in range(-10, 11):
+                            vote_magnitude = 10 - abs(i)
+                            if 0 < projected_card_size + i < second_alignment_size_votes.shape[0]:
+                                second_alignment_size_votes[projected_card_size + i] += vote_magnitude
+                            if 0 < projected_center_x + i < width:
+                                center_x_votes[projected_center_x + i] += vote_magnitude
+                            if 0 < projected_center_y + i < height:
+                                center_y_votes[projected_center_y + i] += vote_magnitude
 
-        a = [0, 0]
-        b = [math.cos(np.radians(elected_side_angle)) * elected_height, math.sin(np.radians(elected_side_angle)) * elected_height]
-        d = [math.sin(np.radians(elected_bottom_angle) * elected_width), math.cos(np.radians(elected_bottom_angle)) * elected_width]
-        c = [b[0] + d[0], b[1] + d[1]]
+        first_alignment_size = np.argmax(first_alignment_size_votes)
+        second_alignment_size = np.argmax(second_alignment_size_votes)
 
-        for vertex in [a, b, c, d]:
-            vertex[0] += elected_x - (elected_width / 2) #FIXME these aren't quite right, ignores angles
-            vertex[0] = round(vertex[0])
-            vertex[1] += elected_y - (elected_height / 2)
-            vertex[1] = round(vertex[1])
+        ax = 500
+        ay = 500
+        bx = round(math.cos(math.radians(first_alignment)) * first_alignment_size) + ax
+        by = round(math.sin(math.radians(first_alignment)) * first_alignment_size) + ay
+        cx = round(math.cos(math.radians(second_alignment)) * second_alignment_size) + ax
+        cy = round(math.sin(math.radians(second_alignment)) * second_alignment_size) + ay
+        dx = bx + cx - ax
+        dy = by + cy - ay
 
-        cv2.line(input_image, a, b, (0, 255, 0), 3)
-        cv2.line(input_image, b, c, (0, 255, 0), 3)
-        cv2.line(input_image, c, d, (0, 255, 0), 3)
-        cv2.line(input_image, d, a, (0, 255, 0), 3)
+        current_center_x = round(np.mean([ax, dx]))
+        current_center_y = round(np.mean([ay, dy]))
+
+        x_shift = np.argmax(center_x_votes) - current_center_x
+        y_shift = np.argmax(center_y_votes) - current_center_y
+
+        ax += x_shift
+        bx += x_shift
+        cx += x_shift
+        dx += x_shift
+        ay += y_shift
+        by += y_shift
+        cy += y_shift
+        dy += y_shift
+
+        a, b, c, d = (ax, ay), (bx, by), (cx, cy), (dx, dy)
+
+        cv2.line(input_image, a, b, (0, 255, 0), 4)
+        cv2.line(input_image, b, d, (0, 255, 0), 4)
+        cv2.line(input_image, c, d, (0, 255, 0), 4)
+        cv2.line(input_image, c, a, (0, 255, 0), 4)
+        cv2.circle(input_image, (np.argmax(center_x_votes), np.argmax(center_y_votes)), 7, (255, 255, 255), -1)
+        for point, label in zip([a, b, c, d], ['A', 'B', 'C', 'D']):
+            cv2.putText(input_image, label, point, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
 
         if self.difficulty and self.background:
-            self._save_image(input_image, f'{self.background}{self.difficulty}projected_card_location')
+            self._save_image(input_image, f'{self.background}{self.difficulty}card_projection')
