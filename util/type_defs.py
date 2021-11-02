@@ -17,6 +17,9 @@ Float2D_1C = npt.NDArray[np.float]  # 2D Float Array, 1 Channel. (h, w)
 Float2D_3C = npt.NDArray[np.float]  # 2D Float Array, 3 Channel. (h, w, 3)
 FloatArray = npt.NDArray[np.float]  # Float Array, Unspecified size
 
+# 1D array of size 2 [X Y]
+Point = Int1D
+
 # 1D array of size 3 with color components [B G R]
 Color = Int1D
 

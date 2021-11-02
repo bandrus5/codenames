@@ -92,6 +92,7 @@ def verbose_display(
     if is_verbose:
         combined_img = combine_images(images_to_display, display_size)
         display_image(combined_img, width=display_size * len(images_to_display))
+        return combined_img
 
 
 def save_image(image: np.ndarray, location: str):
