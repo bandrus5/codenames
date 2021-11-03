@@ -24,9 +24,10 @@ class CardGridRecognizer:
                 cards_bounds.append(card_bounds)
         draw_img = original_img.copy()
         for i, card in enumerate(cards_bounds):
-            point = CardGridRecognizer._point_between_border(card, 0.2, 0.4)
-            cv2.putText(draw_img, str(i), point, cv2.FONT_HERSHEY_PLAIN, 3, color=(0, 0, 255))
-        draw_img = CardContourExtractor.display_contours(draw_img, cards_bounds,return_result=True)
+            point = CardGridRecognizer._point_between_border(card, 0.2, 0.5)
+            cv2.putText(draw_img, str(i), point, cv2.FONT_HERSHEY_PLAIN, 4, color=(0, 0, 255), thickness=6)
+        draw_img = CardContourExtractor.display_contours(draw_img, cards_bounds,return_result=True, thickness=10)
+        cv2.imwrite("viz/10_grid.png", draw_img)
         verbose_display(draw_img)
         return cards_bounds
 
@@ -63,18 +64,22 @@ class CardGridRecognizer:
     def _find_grid_border(threshold_img: Int2D_1C, original_img: Int2D_3C) -> Contour:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         threshold_img1 = cv2.dilate(threshold_img, kernel, iterations=30, borderType=cv2.BORDER_CONSTANT, borderValue=0)
+        cv2.imwrite("viz/07_dilate.png", threshold_img1)
         threshold_img2 = cv2.erode(threshold_img1, kernel, iterations=60, borderType=cv2.BORDER_CONSTANT, borderValue=0)
         threshold_img3 = cv2.dilate(threshold_img2, kernel, iterations=30, borderType=cv2.BORDER_CONSTANT,
                                     borderValue=0)
+        cv2.imwrite("viz/07_erode.png", threshold_img3)
         contours = cv2.findContours(threshold_img3.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         contours = [c.reshape(-1, 2) for c in contours]
-        contour_img = CardContourExtractor.display_contours(original_img, contours, return_result=True)
+        contour_img = CardContourExtractor.display_contours(original_img, contours, return_result=True, thickness=10)
+        cv2.imwrite("viz/08_contour.png", contour_img)
         contours = [CardContourExtractor.simplify_contour(contour, 0.1) for contour in contours]
         contours = [c.reshape(-1, 2) for c in contours]
         areas = [cv2.contourArea(contour) for contour in contours]
         largest_contour = contours[np.argmax(areas)]
         simplified_contour_img = CardContourExtractor.display_contours(original_img, [largest_contour],
-                                                                       return_result=True)
+                                                                       return_result=True, thickness=10)
+        cv2.imwrite("viz/09_simplified.png", simplified_contour_img)
         combined_img = verbose_display(
             [threshold_img, threshold_img1, threshold_img2, threshold_img3, contour_img, simplified_contour_img],
             display_size=400)

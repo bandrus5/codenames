@@ -11,11 +11,20 @@ class CardCropper:
     mm_per_inch = 25.4
 
     @staticmethod
+    def crop_cards(cards_bounds: List[Contour], crop_img: Int2D_3C) -> List[Int2D_3C]:
+        cropped_cards = []
+        for card_bounds in cards_bounds:
+            cropped_card = CardCropper.crop_card(card_bounds, crop_img)
+            cropped_cards.append(cropped_card)
+        return cropped_cards
+
+    @staticmethod
     def crop_card(card_bounds: Contour, original_img: Int2D_3C) -> Int2D_3C:
         width = np.linalg.norm(card_bounds[1] - card_bounds[0])
         height = np.linalg.norm(card_bounds[3] - card_bounds[0])
         card_size = CardCropper.card_size_mm.copy()
-        if height > width:
+        should_rotate_card = height > width
+        if should_rotate_card:
             card_size = np.roll(card_size, 1)
         card_size = card_size / CardCropper.mm_per_inch * CardCropper.px_per_inch
         card_size = card_size.astype(np.int32)
@@ -28,4 +37,6 @@ class CardCropper:
             [0, card.shape[1]]])
         M, _ = cv2.findHomography(card_bounds, cropped_card_bounds)
         card = cv2.warpPerspective(original_img, M, (cropped_card_bounds[2,0], cropped_card_bounds[2,1]))
+        if should_rotate_card:
+            card = cv2.rotate(card, cv2.ROTATE_90_CLOCKWISE)
         return card

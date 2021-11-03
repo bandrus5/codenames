@@ -67,7 +67,7 @@ class CardContourExtractor:
 
     @staticmethod
     def display_contours(input_img: Int2D_3C, contours: List[Contour], display_all_at_once: bool = True,
-                         return_result: bool = False, number_points=False):
+                         return_result: bool = False, number_points: bool = False, thickness: int = 2) -> Optional[Int2D_3C]:
         if display_all_at_once:
             background_img = input_img.copy()
             for i, contour in enumerate(contours):
@@ -77,7 +77,7 @@ class CardContourExtractor:
                     similarity = CardContourExtractor._get_contour_card_similarity(contour)
                     area = cv2.contourArea(contour)
                     print(f"{i} - Count: {line_count:3} Similarity: {similarity:.5f} Area: {area:.2f}")
-                cv2.drawContours(background_img, [contour], -1, (0, 255, 0), 2)
+                cv2.drawContours(background_img, [contour], -1, (0, 255, 0), thickness)
                 if number_points:
                     for i, point in enumerate(contour):
                         cv2.putText(background_img, str(i), point, cv2.FONT_HERSHEY_PLAIN, 2, color=(0, 0, 255))
