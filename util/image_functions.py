@@ -91,7 +91,8 @@ def verbose_display(
         images_to_display: List[Union[Int2D_1C, Int2D_3C, Float2D_3C, Float2D_1C]], display_size: int = 512):
     if is_verbose:
         combined_img = combine_images(images_to_display, display_size)
-        display_image(combined_img, width=display_size * len(images_to_display))
+        display_image(combined_img, width=combined_img.shape[1], height=combined_img.shape[0])
+        return combined_img
 
 
 def save_image(image: np.ndarray, location: str):

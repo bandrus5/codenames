@@ -1,12 +1,17 @@
 import numpy as np
 import numpy.typing as npt
 from cv2 import cv2
+import os
 from image_processor_interface import ImageProcessorInterface
 from data_labelling.game_state import *
 from ryan.foreground_extractor import ForegroundExtractor
 from ryan.color_extractor import  ColorExtractor
+from ryan.card_identifier import CardIdentifier
+from ryan.card_quad_refiner import CardQuadRefiner
 from ryan.card_contour_extractor import CardContourExtractor
 from ryan.color_corrector import  ColorCorrector
+from ryan.card_grid_recognizer import CardGridRecognizer
+from ryan.card_cropper import CardCropper
 from util.image_functions import resize_image
 from util.image_functions import *
 from util.type_defs import *
@@ -25,9 +30,13 @@ class RyanImageProcessor(ImageProcessorInterface):
     # yellow_card_color = np.array([0, 255, 255])
 
     def extract_state_from_image(self, input_image: Int2D_3C) -> Optional[GameState]:
+        os.makedirs("viz", exist_ok=True)
+        cv2.imwrite("viz/01_input.png", input_image)
         resized_size = 1000
         resized_img = resize_image(input_image, width=resized_size, height=resized_size)
-        blurred_img = cv2.GaussianBlur(resized_img, (9, 9), 0)
+        cv2.imwrite("viz/02_resized.png", resized_img)
+        blurred_img = cv2.GaussianBlur(resized_img, (23, 23), 0)
+        cv2.imwrite("viz/03_blurred.png", blurred_img)
         # mask, masked_img = ForegroundExtractor.extract_foreground(blurred_img, 20)
         # mask = None
         # masked_img = blurred_img
@@ -41,36 +50,37 @@ class RyanImageProcessor(ImageProcessorInterface):
         yellow_img = ColorExtractor.extract_color(balanced_img, self.white_card_color, threshold=150, use_only_value=True)
         verbose_display([red_img, blue_img, yellow_img, balanced_img], 512)
 
-        # red_img = self._filter_color(red_img, resized_img)
-        # blue_img = self._filter_color(blue_img, resized_img)
-        yellow_img = self._filter_color(yellow_img, resized_img)
-        # verbose_display([red_img, blue_img, yellow_img, balanced_img], 512)
-
-        # _, threshold_img = cv2.threshold(blurred_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        # threshold_img = cv2.adaptiveThreshold(blurred_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 501, -5)
-
-        # erode_img = cv2.erode(threshold_img, None, iterations=3)
-        # verbose_display([erode_img])
-        # dilate_img = cv2.dilate(erode_img, None, iterations=3)
-        # verbose_display([dilate_img])
-        # edges_img = cv2.Canny(dilate_img, 25, 25, apertureSize=5)
-        # verbose_display([edges_img])
-        # contours = self._find_best_contours(dilate_img, 30, resized_img)
-
-        # lines = cv2.HoughLinesP(edges, 1, np.pi/180, 200, minLineLength=50, maxLineGap=5)
-        # verbose_display(draw_hough_line_segments(resized, lines))
+        threshold_img = cv2.bitwise_or(yellow_img, blue_img)
+        cv2.imwrite("viz/06_combined.png", threshold_img)
+        # card_group_contours, card_group_stats = CardContourExtractor.extract_card_contours(threshold_img, resized_img)
+        cards_quads = CardGridRecognizer.get_cards_quads(threshold_img, resized_img)
+        refined_cards_quads = CardQuadRefiner.refine_cards_quads(cards_quads, resized_img)
+        cropped_cards = CardCropper.crop_cards(refined_cards_quads, resized_img)
+        for cropped_card in cropped_cards:
+            card_value = CardIdentifier.identify_card(cropped_card, RyanImageProcessor.red_card_color, RyanImageProcessor.blue_card_color, RyanImageProcessor.yellow_card_color)
+        self._display_cards(cropped_cards)
 
 
-        # for contour in contours:
-        #     perimeter = cv2.arcLength(contour, True)
-        #     approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
         return GameState(cards=None, key=None, first_turn=None)
+
+    def _display_cards(self, cropped_cards: List[Int2D_3C]):
+        bordered_cards = []
+        for cropped_card in cropped_cards:
+            cropped_card = cv2.copyMakeBorder(cropped_card, 10, 10, 10, 10, borderType=cv2.BORDER_CONSTANT, value=(255, 255, 255))
+            bordered_cards.append(cropped_card)
+        combined_img = verbose_display(bordered_cards,display_size=100)
+        cv2.imwrite("viz/16_cards.png", combined_img)
 
     def _filter_color(self, color_img: Int2D_1C, original_img: Int2D_3C):
         erode_img = cv2.erode(color_img, None, iterations=3)
         dilate_img = cv2.dilate(erode_img, None, iterations=3)
-        contours = CardContourExtractor.extract_card_contours(dilate_img, original_img)
         return dilate_img
+
+
+
+
+
+
 
     # def _get_dominant_colors(self, image):
     #     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 200, 0.1)
