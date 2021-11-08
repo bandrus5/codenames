@@ -37,7 +37,8 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
-        self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
+        # self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
+        self._point_based_ransac(recomposed_bw)
 
         return GameState(cards=None, key=None, first_turn=None)
 
@@ -69,6 +70,25 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             new_image[:,:,2] = np.maximum(new_image[:,:,0],new_image[:,:,2])
             new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)
         return new_image
+
+
+    def _point_based_ransac(self, recomposed_bw):
+        key_card_prototype = [(30, 197), (364, 197), (197, 364), (197, 30)] + [(row, col) for row in [90, 144, 197, 251, 305] for col in [90, 144, 197, 251, 305]]
+        contours = cv2.findContours(recomposed_bw.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        shape_centers = []
+        for c in contours:
+            m = cv2.moments(c)
+            try:
+                cX = int(m['m10'] / m['m00'])
+                cY = int(m['m01'] / m['m00'])
+            except ZeroDivisionError:
+                continue
+            shape_centers.append((cX, cY))
+        # FIXME this function only works if the src and destination have the same number of points. Figure out how to wrap this with repeated random subsets to get the best possible match.
+        ret = cv2.findHomography(np.array(key_card_prototype), np.array(shape_centers), method=cv2.RHO)
+        print('Success')
+        exit()
+
 
 
     def _find_key_grid_line_based_hough(self, input_image, recomposed, recomposed_bw):

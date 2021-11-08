@@ -66,4 +66,4 @@ if __name__ == '__main__':
         print_game_state(image_bundle['label'])
         print('---Predicted Game State---')
         print_game_state(game_state)
-        display_image(image_bundle['image'], 1000, 1000)
+        # display_image(image_bundle['image'], 1000, 1000)
