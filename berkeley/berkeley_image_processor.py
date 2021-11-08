@@ -33,12 +33,14 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         recomposed = self._recompose(input_image, red_image_eroded, blue_image_eroded)
 
         if self.difficulty and self.background:
+            self._save_image(red_image_eroded, f'{self.background}{self.difficulty}red')
+            self._save_image(blue_image_eroded, f'{self.background}{self.difficulty}blue')
             self._save_image(input_image, f'{self.background}{self.difficulty}truth')
             # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
-        # self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
-        self._point_based_ransac(recomposed_bw)
+        self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
+        # self._point_based_ransac(recomposed_bw)
 
         return GameState(cards=None, key=None, first_turn=None)
 
@@ -85,9 +87,9 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
                 continue
             shape_centers.append((cX, cY))
         # FIXME this function only works if the src and destination have the same number of points. Figure out how to wrap this with repeated random subsets to get the best possible match.
-        ret = cv2.findHomography(np.array(key_card_prototype), np.array(shape_centers), method=cv2.RHO)
-        print('Success')
-        exit()
+        # ret = cv2.findHomography(np.array(key_card_prototype), np.array(shape_centers), method=cv2.RHO)
+        # print('Success')
+        # exit()
 
 
 

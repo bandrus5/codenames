@@ -2,7 +2,7 @@
 
 # Pycharm IDE etc
 .idea
-berkeley/results/*
+# berkeley/results/*
 
 viz/
 data_labelling/data/dark
