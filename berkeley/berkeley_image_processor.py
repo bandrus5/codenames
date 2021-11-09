@@ -5,6 +5,7 @@ from data_labelling.game_state import *
 from util.image_functions import display_image, save_image
 from util.image_functions import draw_hough_line_segments
 import math
+from time import time
 
 def cartesian_to_homogeneous(point):
     return np.array([point[0], point[1], 1])
@@ -93,13 +94,14 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
 
     def _score_homography(self, homography, prototype_points, image_points, thresh):
         score = 0
-        for point in prototype_points:
-            homogeneous_point = cartesian_to_homogeneous(point)
-            translated_point = np.matmul(homography, homogeneous_point)
-            if np.isnan(np.sum(translated_point)):
+        prototype_array = np.array(prototype_points, dtype=np.float32)
+        homogeneous_prototype_array = np.append(prototype_array, np.ones((prototype_array.shape[0], 1)), axis=-1)
+        transformed_points = np.matmul(homography, homogeneous_prototype_array.T).T.astype(int)[:,:-1]
+        for transformed_point in transformed_points:
+            if np.isnan(np.sum(transformed_point)):
                 continue
             for point2 in image_points:
-                if self._distance_within_threshold(homogeneous_to_cartesian(translated_point), point2, thresh):
+                if self._distance_within_threshold(transformed_point, point2, thresh):
                     score += 1
                     continue
         return score
