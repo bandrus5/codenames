@@ -38,9 +38,9 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         blue_image_eroded = cv2.erode(blue_image_open, self.kernel, iterations = 4)
 
         recomposed = self._recompose(input_image, red_image_eroded, blue_image_eroded)
-
-        if self.difficulty and self.background:
-            self._save_image(input_image, f'{self.background}{self.difficulty}truth')
+        #
+        # if self.difficulty and self.background:
+        #     self._save_image(input_image, f'{self.background}{self.difficulty}truth')
             # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
@@ -97,13 +97,11 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         prototype_array = np.array(prototype_points, dtype=np.float32)
         homogeneous_prototype_array = np.append(prototype_array, np.ones((prototype_array.shape[0], 1)), axis=-1)
         transformed_points = np.matmul(homography, homogeneous_prototype_array.T).T.astype(int)[:,:-1]
-        for transformed_point in transformed_points:
-            if np.isnan(np.sum(transformed_point)):
-                continue
-            for point2 in image_points:
-                if self._distance_within_threshold(transformed_point, point2, thresh):
+        for image_point in image_points:
+            for transformed_point in transformed_points:
+                if self._distance_within_threshold(transformed_point, image_point, thresh):
                     score += 1
-                    continue
+                    break
         return score
 
     def _point_based_ransac(self, input_image, recomposed_bw):
@@ -181,4 +179,4 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
                 cv2.circle(input_image, translated_point, 7, (0, 255, 0), -1)
 
             if self.difficulty and self.background:
-                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location')
+                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location2')
