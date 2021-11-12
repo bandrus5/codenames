@@ -5,6 +5,13 @@ from data_labelling.game_state import *
 from util.image_functions import display_image, save_image
 from util.image_functions import draw_hough_line_segments
 import math
+from time import time
+
+def cartesian_to_homogeneous(point):
+    return np.array([point[0], point[1], 1])
+
+def homogeneous_to_cartesian(point):
+    return (round(point[0]), round(point[1]))
 
 class BerkeleyImageProcessor(ImageProcessorInterface):
 
@@ -31,13 +38,14 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         blue_image_eroded = cv2.erode(blue_image_open, self.kernel, iterations = 4)
 
         recomposed = self._recompose(input_image, red_image_eroded, blue_image_eroded)
-
-        if self.difficulty and self.background:
-            self._save_image(input_image, f'{self.background}{self.difficulty}truth')
+        #
+        # if self.difficulty and self.background:
+        #     self._save_image(input_image, f'{self.background}{self.difficulty}truth')
             # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
-        self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
+        # self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
+        self._point_based_ransac(input_image, recomposed_bw)
 
         return GameState(cards=None, key=None, first_turn=None)
 
@@ -70,10 +78,39 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)
         return new_image
 
+    def _has_similar_transform(self, src1, dest1, src2, dest2, thresh):
+        for ind in [0, 1]:
+            dist1 = dest1[ind] - src1[ind]
+            dist2 = dest2[ind] - src2[ind]
+            if abs(dist2 - dist1) > thresh[ind]:
+                return False
+        return True
 
-    def _find_key_grid_line_based_hough(self, input_image, recomposed, recomposed_bw):
+    def _distance_within_threshold(self, point1, point2, thresh):
+        for ind in [0, 1]:
+            if abs(point1[ind] - point2[ind]) > thresh[ind]:
+                return False
+        return True
+
+    def _score_homography(self, homography, prototype_points, image_points, thresh):
+        score = 0
+        prototype_array = np.array(prototype_points, dtype=np.float32)
+        homogeneous_prototype_array = np.append(prototype_array, np.ones((prototype_array.shape[0], 1)), axis=-1)
+        transformed_points = np.matmul(homography, homogeneous_prototype_array.T).T.astype(int)[:,:-1]
+        for image_point in image_points:
+            for transformed_point in transformed_points:
+                if self._distance_within_threshold(transformed_point, image_point, thresh):
+                    score += 1
+                    break
+        return score
+
+    def _point_based_ransac(self, input_image, recomposed_bw):
+        input_image = np.copy(input_image)
+        key_card_prototype = [(30, 197), (364, 197), (197, 364), (197, 30)] + [(row, col) for row in [90, 144, 197, 251, 305] for col in [90, 144, 197, 251, 305]]
         contours = cv2.findContours(recomposed_bw.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         shape_centers = []
+        height, width = recomposed_bw.shape[:2]
+        new_visualization = np.zeros((height, width, 3))
         for c in contours:
             m = cv2.moments(c)
             try:
@@ -82,131 +119,64 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             except ZeroDivisionError:
                 continue
             shape_centers.append((cX, cY))
-            cv2.drawContours(recomposed, [c], -1, (0, 255, 0), 2)
-            cv2.circle(recomposed, (cX, cY), 7, (255, 255, 255), -1)
-        if self.difficulty and self.background:
-            self._save_image(recomposed, f'{self.background}{self.difficulty}contours')
+            cv2.circle(new_visualization, (cX, cY), 7, (255, 255, 255), -1)
 
-        height, width = input_image.shape[:2]
 
-        angle_votes = np.zeros(180)
+        x_match_thresh = math.ceil(width * 0.0025)
+        y_match_thresh = math.ceil(height * 0.0025)
 
-        for shape_center1 in shape_centers:
-            x1, y1 = shape_center1
-            for shape_center2 in shape_centers:
-                x2, y2 = shape_center2
-                if (x1 + y1) > (x2 + y2) or (x1 == x2 and y1 == y2):
+        x_dist_thresh = math.ceil(width * 0.1)
+        y_dist_thresh = math.ceil(height * 0.1)
+
+        parallelograms = []
+        for A in shape_centers:
+            for B in shape_centers:
+                if B == A or B[1] < A[1]:
                     continue
+                for C in shape_centers:
+                    if C in [A, B] or not self._distance_within_threshold(A, C, (x_dist_thresh, y_dist_thresh)):
+                        continue
+                    for D in shape_centers:
+                        if D in [A, B, C] or D[0] < A[0]:
+                            continue
+                        if self._has_similar_transform(A, B, D, C, (x_match_thresh, y_match_thresh)) and self._has_similar_transform(A, D, B, C, (x_match_thresh, y_match_thresh)):
+                            parallelograms.append((A, B, C, D))
 
-                deltaX = x2 - x1
-                deltaY = y2 - y1
+        prototype_axis_aligned_rectangles = [((90, 90), (90, 144), (144, 144), (144, 90)), ((90, 90), (90, 144), (197, 144), (197, 90)), ((90, 90), (90, 144), (251, 144), (251, 90)), ((90, 90), (90, 144), (305, 144), (305, 90)), ((90, 90), (90, 197), (144, 197), (144, 90)), ((90, 90), (90, 197), (197, 197), (197, 90)), ((90, 90), (90, 197), (251, 197), (251, 90)), ((90, 90), (90, 197), (305, 197), (305, 90)), ((90, 90), (90, 251), (144, 251), (144, 90)), ((90, 90), (90, 251), (197, 251), (197, 90)), ((90, 90), (90, 251), (251, 251), (251, 90)), ((90, 90), (90, 251), (305, 251), (305, 90)), ((90, 90), (90, 305), (144, 305), (144, 90)), ((90, 90), (90, 305), (197, 305), (197, 90)), ((90, 90), (90, 305), (251, 305), (251, 90)), ((90, 90), (90, 305), (305, 305), (305, 90)), ((90, 144), (90, 197), (144, 197), (144, 144)), ((90, 144), (90, 197), (197, 197), (197, 144)), ((90, 144), (90, 197), (251, 197), (251, 144)), ((90, 144), (90, 197), (305, 197), (305, 144)), ((90, 144), (90, 251), (144, 251), (144, 144)), ((90, 144), (90, 251), (197, 251), (197, 144)), ((90, 144), (90, 251), (251, 251), (251, 144)), ((90, 144), (90, 251), (305, 251), (305, 144)), ((90, 144), (90, 305), (144, 305), (144, 144)), ((90, 144), (90, 305), (197, 305), (197, 144)), ((90, 144), (90, 305), (251, 305), (251, 144)), ((90, 144), (90, 305), (305, 305), (305, 144)), ((90, 197), (90, 251), (144, 251), (144, 197)), ((90, 197), (90, 251), (197, 251), (197, 197)), ((90, 197), (90, 251), (251, 251), (251, 197)), ((90, 197), (90, 251), (305, 251), (305, 197)), ((90, 197), (90, 305), (144, 305), (144, 197)), ((90, 197), (90, 305), (197, 305), (197, 197)), ((90, 197), (90, 305), (251, 305), (251, 197)), ((90, 197), (90, 305), (305, 305), (305, 197)), ((90, 251), (90, 305), (144, 305), (144, 251)), ((90, 251), (90, 305), (197, 305), (197, 251)), ((90, 251), (90, 305), (251, 305), (251, 251)), ((90, 251), (90, 305), (305, 305), (305, 251)), ((144, 90), (144, 144), (197, 144), (197, 90)), ((144, 90), (144, 144), (251, 144), (251, 90)), ((144, 90), (144, 144), (305, 144), (305, 90)), ((144, 90), (144, 197), (197, 197), (197, 90)), ((144, 90), (144, 197), (251, 197), (251, 90)), ((144, 90), (144, 197), (305, 197), (305, 90)), ((144, 90), (144, 251), (197, 251), (197, 90)), ((144, 90), (144, 251), (251, 251), (251, 90)), ((144, 90), (144, 251), (305, 251), (305, 90)), ((144, 90), (144, 305), (197, 305), (197, 90)), ((144, 90), (144, 305), (251, 305), (251, 90)), ((144, 90), (144, 305), (305, 305), (305, 90)), ((144, 144), (144, 197), (197, 197), (197, 144)), ((144, 144), (144, 197), (251, 197), (251, 144)), ((144, 144), (144, 197), (305, 197), (305, 144)), ((144, 144), (144, 251), (197, 251), (197, 144)), ((144, 144), (144, 251), (251, 251), (251, 144)), ((144, 144), (144, 251), (305, 251), (305, 144)), ((144, 144), (144, 305), (197, 305), (197, 144)), ((144, 144), (144, 305), (251, 305), (251, 144)), ((144, 144), (144, 305), (305, 305), (305, 144)), ((144, 197), (144, 251), (197, 251), (197, 197)), ((144, 197), (144, 251), (251, 251), (251, 197)), ((144, 197), (144, 251), (305, 251), (305, 197)), ((144, 197), (144, 305), (197, 305), (197, 197)), ((144, 197), (144, 305), (251, 305), (251, 197)), ((144, 197), (144, 305), (305, 305), (305, 197)), ((144, 251), (144, 305), (197, 305), (197, 251)), ((144, 251), (144, 305), (251, 305), (251, 251)), ((144, 251), (144, 305), (305, 305), (305, 251)), ((197, 90), (197, 144), (251, 144), (251, 90)), ((197, 90), (197, 144), (305, 144), (305, 90)), ((197, 90), (197, 197), (251, 197), (251, 90)), ((197, 90), (197, 197), (305, 197), (305, 90)), ((197, 90), (197, 251), (251, 251), (251, 90)), ((197, 90), (197, 251), (305, 251), (305, 90)), ((197, 90), (197, 305), (251, 305), (251, 90)), ((197, 90), (197, 305), (305, 305), (305, 90)), ((197, 144), (197, 197), (251, 197), (251, 144)), ((197, 144), (197, 197), (305, 197), (305, 144)), ((197, 144), (197, 251), (251, 251), (251, 144)), ((197, 144), (197, 251), (305, 251), (305, 144)), ((197, 144), (197, 305), (251, 305), (251, 144)), ((197, 144), (197, 305), (305, 305), (305, 144)), ((197, 197), (197, 251), (251, 251), (251, 197)), ((197, 197), (197, 251), (305, 251), (305, 197)), ((197, 197), (197, 305), (251, 305), (251, 197)), ((197, 197), (197, 305), (305, 305), (305, 197)), ((197, 251), (197, 305), (251, 305), (251, 251)), ((197, 251), (197, 305), (305, 305), (305, 251)), ((251, 90), (251, 144), (305, 144), (305, 90)), ((251, 90), (251, 197), (305, 197), (305, 90)), ((251, 90), (251, 251), (305, 251), (305, 90)), ((251, 90), (251, 305), (305, 305), (305, 90)), ((251, 144), (251, 197), (305, 197), (305, 144)), ((251, 144), (251, 251), (305, 251), (305, 144)), ((251, 144), (251, 305), (305, 305), (305, 144)), ((251, 197), (251, 251), (305, 251), (305, 197)), ((251, 197), (251, 305), (305, 305), (305, 197)), ((251, 251), (251, 305), (305, 305), (305, 251)), ((30, 197), (364, 197), (197, 364), (197, 30))]
 
-                if abs(deltaX) > width / 20 or abs(deltaY) > height / 20:
+        # for A in key_card_prototype:
+        #     for B in key_card_prototype:
+        #         if B == A or B[1] < A[1]:
+        #             continue
+        #         for C in key_card_prototype:
+        #             if C in [A, B]:
+        #                 continue
+        #             for D in key_card_prototype:
+        #                 if D in [A, B, C] or D[0] < A[0]:
+        #                     continue
+        #                 # if self._has_similar_transform(A, B, D, C, (1, 1)) and self._has_similar_transform(A, D, B, C, (1, 1)):
+        #                 #     prototype_parallelograms.append((A, B, C, D))
+        #                 if A[0] == B[0] and C[0] == D[0] and A[1] == D[1] and B[1] == C[1]:
+        #                     prototype_axis_aligned_rectangles.append((A, B, C, D))
+
+        best_homography = None
+        best_score = -1
+        for oA, oB, oC, oD in parallelograms:
+            for pA, pB, pC, pD in prototype_axis_aligned_rectangles:
+                homography = cv2.findHomography(np.array([pA, pB, pC, pD]), np.array([oA, oB, oC, oD]), method=cv2.RHO)[0]
+                if homography is None or homography.size == 0:
                     continue
+                score = self._score_homography(homography, key_card_prototype, shape_centers, (x_match_thresh, y_match_thresh))
+                if score > best_score:
+                    best_score = score
+                    best_homography = homography
+        print(best_score)
 
-                if deltaX == 0:
-                    angle_votes[89] += 1
-                    angle_votes[90] += 3
-                    angle_votes[91] += 1
-                else:
-                    projected_angle = round(math.degrees(math.atan2(deltaY, deltaX)))
-                    angle_votes[(projected_angle - 1) % 180] += 1
-                    angle_votes[projected_angle % 180] += 3
-                    angle_votes[(projected_angle + 1) % 180] += 1
 
-        first_alignment = np.argmax(angle_votes)
-        for i in range(-40, 41):
-            angle_votes[(first_alignment + i) % 180] = 0
-        second_alignment = np.argmax(angle_votes)
+        if best_score > -1:
+            for point in key_card_prototype:
+                translated_point = homogeneous_to_cartesian(np.matmul(best_homography, cartesian_to_homogeneous(point)))
+                cv2.circle(input_image, translated_point, 7, (0, 255, 0), -1)
 
-        if first_alignment < second_alignment:
-            second_alignment, first_alignment = first_alignment, second_alignment
-
-        first_alignment_size_votes = np.zeros(min(width, height))
-        second_alignment_size_votes = np.zeros(min(width, height))
-        center_x_votes = np.zeros(width)
-        center_y_votes = np.zeros(height)
-        for shape_center1 in shape_centers:
-            x1, y1 = shape_center1
-            for shape_center2 in shape_centers:
-                x2, y2 = shape_center2
-                if (x1 + y1) > (x2 + y2) or (x1 == x2 and y1 == y2):
-                    continue
-
-                deltaX = x2 - x1
-                deltaY = y2 - y1
-
-                if abs(deltaX) > width / 20 or abs(deltaY) > height / 20:
-                    continue
-                if deltaX == 0:
-                    projected_angle = 90
-                else:
-                    projected_angle = round(math.degrees(math.atan2(deltaY, deltaX)))
-                for delta in range(-3, 4):
-                    if (projected_angle + delta) % 180 == first_alignment:
-                        distance = math.dist(shape_center1, shape_center2)
-                        projected_card_size = round(distance * 7)
-                        projected_center_x = round(np.mean([x1, x2]))
-                        projected_center_y = round(np.mean([y1, y2]))
-                        for i in range(-10, 11):
-                            vote_magnitude = 10 - abs(i)
-                            if 0 < projected_card_size + i < first_alignment_size_votes.shape[0]:
-                                first_alignment_size_votes[projected_card_size + i] += vote_magnitude
-                            if 0 < projected_center_x + i < width:
-                                center_x_votes[projected_center_x + i] += vote_magnitude
-                            if 0 < projected_center_y + i < height:
-                                center_y_votes[projected_center_y + i] += vote_magnitude
-
-                    if (projected_angle + delta) % 180 == second_alignment:
-                        distance = math.dist(shape_center1, shape_center2)
-                        projected_card_size = round(distance * 7)
-                        projected_center_x = round(np.mean([x1, x2]))
-                        projected_center_y = round(np.mean([y1, y2]))
-                        for i in range(-10, 11):
-                            vote_magnitude = 10 - abs(i)
-                            if 0 < projected_card_size + i < second_alignment_size_votes.shape[0]:
-                                second_alignment_size_votes[projected_card_size + i] += vote_magnitude
-                            if 0 < projected_center_x + i < width:
-                                center_x_votes[projected_center_x + i] += vote_magnitude
-                            if 0 < projected_center_y + i < height:
-                                center_y_votes[projected_center_y + i] += vote_magnitude
-
-        first_alignment_size = np.argmax(first_alignment_size_votes)
-        second_alignment_size = np.argmax(second_alignment_size_votes)
-
-        ax = 500
-        ay = 500
-        bx = round(math.cos(math.radians(first_alignment)) * first_alignment_size) + ax
-        by = round(math.sin(math.radians(first_alignment)) * first_alignment_size) + ay
-        cx = round(math.cos(math.radians(second_alignment)) * second_alignment_size) + ax
-        cy = round(math.sin(math.radians(second_alignment)) * second_alignment_size) + ay
-        dx = bx + cx - ax
-        dy = by + cy - ay
-
-        current_center_x = round(np.mean([ax, dx]))
-        current_center_y = round(np.mean([ay, dy]))
-
-        x_shift = np.argmax(center_x_votes) - current_center_x
-        y_shift = np.argmax(center_y_votes) - current_center_y
-
-        ax += x_shift
-        bx += x_shift
-        cx += x_shift
-        dx += x_shift
-        ay += y_shift
-        by += y_shift
-        cy += y_shift
-        dy += y_shift
-
-        a, b, c, d = (ax, ay), (bx, by), (cx, cy), (dx, dy)
-
-        cv2.line(input_image, a, b, (0, 255, 0), 4)
-        cv2.line(input_image, b, d, (0, 255, 0), 4)
-        cv2.line(input_image, c, d, (0, 255, 0), 4)
-        cv2.line(input_image, c, a, (0, 255, 0), 4)
-        cv2.circle(input_image, (np.argmax(center_x_votes), np.argmax(center_y_votes)), 7, (255, 255, 255), -1)
-        for point, label in zip([a, b, c, d], ['A', 'B', 'C', 'D']):
-            cv2.putText(input_image, label, point, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-
-        if self.difficulty and self.background:
-            self._save_image(input_image, f'{self.background}{self.difficulty}card_projection')
+            if self.difficulty and self.background:
+                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location2')
