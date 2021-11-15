@@ -23,6 +23,7 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             except:
                 pass
         self.kernel = np.ones((5,5),np.uint8)
+        self.key_card_prototype = [(30, 197), (364, 197), (197, 364), (197, 30)] + [(row, col) for row in [305, 251, 197, 144, 90] for col in [90, 144, 197, 251, 305]]
 
     def extract_state_from_image(self, input_image: np.ndarray) -> Optional[GameState]:
         input_image = cv2.resize(input_image, (0,0), fx = 0.5, fy = 0.5)
@@ -45,7 +46,9 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
         # self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
-        self._point_based_ransac(input_image, recomposed_bw)
+        homography = self._point_based_ransac(input_image, recomposed_bw)
+
+        self._get_state_from_homography(input_image, homography)
 
         return GameState(cards=None, key=None, first_turn=None)
 
@@ -106,7 +109,6 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
 
     def _point_based_ransac(self, input_image, recomposed_bw):
         input_image = np.copy(input_image)
-        key_card_prototype = [(30, 197), (364, 197), (197, 364), (197, 30)] + [(row, col) for row in [90, 144, 197, 251, 305] for col in [90, 144, 197, 251, 305]]
         contours = cv2.findContours(recomposed_bw.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         shape_centers = []
         height, width = recomposed_bw.shape[:2]
@@ -144,6 +146,7 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
 
         prototype_axis_aligned_rectangles = [((90, 90), (90, 144), (144, 144), (144, 90)), ((90, 90), (90, 144), (197, 144), (197, 90)), ((90, 90), (90, 144), (251, 144), (251, 90)), ((90, 90), (90, 144), (305, 144), (305, 90)), ((90, 90), (90, 197), (144, 197), (144, 90)), ((90, 90), (90, 197), (197, 197), (197, 90)), ((90, 90), (90, 197), (251, 197), (251, 90)), ((90, 90), (90, 197), (305, 197), (305, 90)), ((90, 90), (90, 251), (144, 251), (144, 90)), ((90, 90), (90, 251), (197, 251), (197, 90)), ((90, 90), (90, 251), (251, 251), (251, 90)), ((90, 90), (90, 251), (305, 251), (305, 90)), ((90, 90), (90, 305), (144, 305), (144, 90)), ((90, 90), (90, 305), (197, 305), (197, 90)), ((90, 90), (90, 305), (251, 305), (251, 90)), ((90, 90), (90, 305), (305, 305), (305, 90)), ((90, 144), (90, 197), (144, 197), (144, 144)), ((90, 144), (90, 197), (197, 197), (197, 144)), ((90, 144), (90, 197), (251, 197), (251, 144)), ((90, 144), (90, 197), (305, 197), (305, 144)), ((90, 144), (90, 251), (144, 251), (144, 144)), ((90, 144), (90, 251), (197, 251), (197, 144)), ((90, 144), (90, 251), (251, 251), (251, 144)), ((90, 144), (90, 251), (305, 251), (305, 144)), ((90, 144), (90, 305), (144, 305), (144, 144)), ((90, 144), (90, 305), (197, 305), (197, 144)), ((90, 144), (90, 305), (251, 305), (251, 144)), ((90, 144), (90, 305), (305, 305), (305, 144)), ((90, 197), (90, 251), (144, 251), (144, 197)), ((90, 197), (90, 251), (197, 251), (197, 197)), ((90, 197), (90, 251), (251, 251), (251, 197)), ((90, 197), (90, 251), (305, 251), (305, 197)), ((90, 197), (90, 305), (144, 305), (144, 197)), ((90, 197), (90, 305), (197, 305), (197, 197)), ((90, 197), (90, 305), (251, 305), (251, 197)), ((90, 197), (90, 305), (305, 305), (305, 197)), ((90, 251), (90, 305), (144, 305), (144, 251)), ((90, 251), (90, 305), (197, 305), (197, 251)), ((90, 251), (90, 305), (251, 305), (251, 251)), ((90, 251), (90, 305), (305, 305), (305, 251)), ((144, 90), (144, 144), (197, 144), (197, 90)), ((144, 90), (144, 144), (251, 144), (251, 90)), ((144, 90), (144, 144), (305, 144), (305, 90)), ((144, 90), (144, 197), (197, 197), (197, 90)), ((144, 90), (144, 197), (251, 197), (251, 90)), ((144, 90), (144, 197), (305, 197), (305, 90)), ((144, 90), (144, 251), (197, 251), (197, 90)), ((144, 90), (144, 251), (251, 251), (251, 90)), ((144, 90), (144, 251), (305, 251), (305, 90)), ((144, 90), (144, 305), (197, 305), (197, 90)), ((144, 90), (144, 305), (251, 305), (251, 90)), ((144, 90), (144, 305), (305, 305), (305, 90)), ((144, 144), (144, 197), (197, 197), (197, 144)), ((144, 144), (144, 197), (251, 197), (251, 144)), ((144, 144), (144, 197), (305, 197), (305, 144)), ((144, 144), (144, 251), (197, 251), (197, 144)), ((144, 144), (144, 251), (251, 251), (251, 144)), ((144, 144), (144, 251), (305, 251), (305, 144)), ((144, 144), (144, 305), (197, 305), (197, 144)), ((144, 144), (144, 305), (251, 305), (251, 144)), ((144, 144), (144, 305), (305, 305), (305, 144)), ((144, 197), (144, 251), (197, 251), (197, 197)), ((144, 197), (144, 251), (251, 251), (251, 197)), ((144, 197), (144, 251), (305, 251), (305, 197)), ((144, 197), (144, 305), (197, 305), (197, 197)), ((144, 197), (144, 305), (251, 305), (251, 197)), ((144, 197), (144, 305), (305, 305), (305, 197)), ((144, 251), (144, 305), (197, 305), (197, 251)), ((144, 251), (144, 305), (251, 305), (251, 251)), ((144, 251), (144, 305), (305, 305), (305, 251)), ((197, 90), (197, 144), (251, 144), (251, 90)), ((197, 90), (197, 144), (305, 144), (305, 90)), ((197, 90), (197, 197), (251, 197), (251, 90)), ((197, 90), (197, 197), (305, 197), (305, 90)), ((197, 90), (197, 251), (251, 251), (251, 90)), ((197, 90), (197, 251), (305, 251), (305, 90)), ((197, 90), (197, 305), (251, 305), (251, 90)), ((197, 90), (197, 305), (305, 305), (305, 90)), ((197, 144), (197, 197), (251, 197), (251, 144)), ((197, 144), (197, 197), (305, 197), (305, 144)), ((197, 144), (197, 251), (251, 251), (251, 144)), ((197, 144), (197, 251), (305, 251), (305, 144)), ((197, 144), (197, 305), (251, 305), (251, 144)), ((197, 144), (197, 305), (305, 305), (305, 144)), ((197, 197), (197, 251), (251, 251), (251, 197)), ((197, 197), (197, 251), (305, 251), (305, 197)), ((197, 197), (197, 305), (251, 305), (251, 197)), ((197, 197), (197, 305), (305, 305), (305, 197)), ((197, 251), (197, 305), (251, 305), (251, 251)), ((197, 251), (197, 305), (305, 305), (305, 251)), ((251, 90), (251, 144), (305, 144), (305, 90)), ((251, 90), (251, 197), (305, 197), (305, 90)), ((251, 90), (251, 251), (305, 251), (305, 90)), ((251, 90), (251, 305), (305, 305), (305, 90)), ((251, 144), (251, 197), (305, 197), (305, 144)), ((251, 144), (251, 251), (305, 251), (305, 144)), ((251, 144), (251, 305), (305, 305), (305, 144)), ((251, 197), (251, 251), (305, 251), (305, 197)), ((251, 197), (251, 305), (305, 305), (305, 197)), ((251, 251), (251, 305), (305, 305), (305, 251)), ((30, 197), (364, 197), (197, 364), (197, 30))]
 
+        # The following code produces the prototype_axis_aligned_rectangles list, but it doesn't make sense to rerun every time.
         # for A in key_card_prototype:
         #     for B in key_card_prototype:
         #         if B == A or B[1] < A[1]:
@@ -166,17 +169,69 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
                 homography = cv2.findHomography(np.array([pA, pB, pC, pD]), np.array([oA, oB, oC, oD]), method=cv2.RHO)[0]
                 if homography is None or homography.size == 0:
                     continue
-                score = self._score_homography(homography, key_card_prototype, shape_centers, (x_match_thresh, y_match_thresh))
+                score = self._score_homography(homography, self.key_card_prototype, shape_centers, (x_match_thresh, y_match_thresh))
                 if score > best_score:
                     best_score = score
                     best_homography = homography
-        print(best_score)
 
-
+        # FIXME handle failure case
         if best_score > -1:
-            for point in key_card_prototype:
+            for point in self.key_card_prototype:
                 translated_point = homogeneous_to_cartesian(np.matmul(best_homography, cartesian_to_homogeneous(point)))
                 cv2.circle(input_image, translated_point, 7, (0, 255, 0), -1)
 
             if self.difficulty and self.background:
-                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location2')
+                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location')
+        return best_homography
+
+
+    def _get_state_from_homography(self, input_image, homography):
+        def cv_to_rgb(cv_rep):
+            i_cv_rep = cv_rep.astype(int)
+            rgb = [i_cv_rep[2], i_cv_rep[1], i_cv_rep[0]]
+            hex_vals = [hex(c)[2:] for c in rgb]
+            normalized = ['0' + val if len(val) == 1 else val for val in hex_vals]
+            return '#' + ''.join(normalized) + '\t' + f'({", ".join([str(el) for el in rgb])})'
+        prototype_array = np.array(self.key_card_prototype, dtype=np.float32)
+        homogeneous_prototype_array = np.append(prototype_array, np.ones((prototype_array.shape[0], 1)), axis=-1)
+        transformed_points = np.matmul(homography, homogeneous_prototype_array.T).T.astype(int)[:,:-1]
+        mean_colors = []
+
+        sample_size = round(min(input_image.shape[:2]) * 0.01)
+        for image_point in transformed_points:
+            relevant_subset = input_image[image_point[1]-sample_size:image_point[1]+sample_size+1,image_point[0]-sample_size:image_point[0]+sample_size+1,:]
+            mean_colors.append(relevant_subset.reshape(relevant_subset.size//3, 3).mean(axis=0))
+
+        mean_colors = np.array(mean_colors)
+        first_turn_color = mean_colors[:4].mean(axis=0)
+        grid_colors = mean_colors[4:]
+
+        if first_turn_color[0] > first_turn_color[2]:
+            first_turn = 'b'
+        else:
+            first_turn = 'r'
+
+        grid_assignments = [None] * 25
+        color_darkness = [max(row) for row in grid_colors]
+        grid_assignments[color_darkness.index(min(color_darkness))] = 'k'
+        color_redness = [row[2] - np.mean(row[0:2]) for row in grid_colors]
+        filtered_color_redness = [el for i, el in enumerate(color_redness) if grid_assignments[i] is None]
+        sorted_color_redness = sorted(filtered_color_redness, reverse=True)
+        for scr in sorted_color_redness[:9 if first_turn == 'r' else 8]:
+            grid_assignments[color_redness.index(scr)] = 'r'
+        color_blueness = [row[0] - np.mean(row[1:]) for row in grid_colors]
+        filtered_color_blueness = [el for i, el in enumerate(color_blueness) if grid_assignments[i] is None]
+        sorted_color_blueness = sorted(filtered_color_blueness, reverse=True)
+        for scb in sorted_color_blueness[:9 if first_turn == 'b' else 8]:
+            grid_assignments[color_blueness.index(scb)] = 'b'
+        for i in range(len(grid_assignments)):
+            if grid_assignments[i] is None:
+                grid_assignments[i] = 'y'
+
+        for image_point, grid_assignment in zip(transformed_points[4:], grid_assignments):
+            cv2.circle(input_image, image_point, 8, (0, 255, 0), -1)
+            color = (0, 0, 0) if grid_assignment == 'k' else (0, 0, 255) if grid_assignment == 'r' else (255, 0, 0) if grid_assignment == 'b' else (183, 228, 249)
+            cv2.circle(input_image, image_point, 7, color, -1)
+
+        if self.difficulty and self.background:
+            self._save_image(input_image, f'{self.background}{self.difficulty}detailed_prediction')
