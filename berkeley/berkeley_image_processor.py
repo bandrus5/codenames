@@ -39,18 +39,13 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         blue_image_eroded = cv2.erode(blue_image_open, self.kernel, iterations = 4)
 
         recomposed = self._recompose(input_image, red_image_eroded, blue_image_eroded)
-        #
-        # if self.difficulty and self.background:
-        #     self._save_image(input_image, f'{self.background}{self.difficulty}truth')
-            # self._save_image(recomposed, f'{self.background}{self.difficulty}recomposed')
 
         recomposed_bw = self._recompose(input_image, red_image_eroded, blue_image_eroded, bw=True)
-        # self._find_key_grid_line_based_hough(input_image, recomposed, recomposed_bw)
         homography = self._point_based_ransac(input_image, recomposed_bw)
 
-        self._get_state_from_homography(input_image, homography)
+        first_turn, key = self._get_state_from_homography(input_image, homography)
 
-        return GameState(cards=None, key=None, first_turn=None)
+        return GameState(cards=None, key=key, first_turn=first_turn)
 
     def _save_image(self, image, fn):
         save_image(image, f'berkeley/results/{fn}.png')
@@ -180,8 +175,6 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
                 translated_point = homogeneous_to_cartesian(np.matmul(best_homography, cartesian_to_homogeneous(point)))
                 cv2.circle(input_image, translated_point, 7, (0, 255, 0), -1)
 
-            if self.difficulty and self.background:
-                self._save_image(input_image, f'{self.background}{self.difficulty}predicted_location')
         return best_homography
 
 
@@ -192,9 +185,48 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
             hex_vals = [hex(c)[2:] for c in rgb]
             normalized = ['0' + val if len(val) == 1 else val for val in hex_vals]
             return '#' + ''.join(normalized) + '\t' + f'({", ".join([str(el) for el in rgb])})'
+
+        def y_flip(arr):
+            return np.flip(arr, axis=0)
+
+        def x_flip(arr):
+            return np.flip(arr, axis=1)
+
+        def transpose(arr):
+            return arr.T
+
         prototype_array = np.array(self.key_card_prototype, dtype=np.float32)
         homogeneous_prototype_array = np.append(prototype_array, np.ones((prototype_array.shape[0], 1)), axis=-1)
         transformed_points = np.matmul(homography, homogeneous_prototype_array.T).T.astype(int)[:,:-1]
+
+        center = transformed_points[16]
+        top_row_mean = transformed_points[6]
+        left_col_mean = transformed_points[14]
+
+        orientation_label = ''
+        if abs(top_row_mean[0] - center[0]) > abs(left_col_mean[0] - center[0]):
+            if top_row_mean[0] > center[0]:
+                if left_col_mean[1] > center[1]:
+                    orientation_label = '32'
+                else:
+                    orientation_label = '30'
+            else:
+                if left_col_mean[1] > center[1]:
+                    orientation_label = '12'
+                else:
+                    orientation_label = '10'
+        else:
+            if left_col_mean[0] > center[0]:
+                if top_row_mean[1] > center[1]:
+                    orientation_label = '23'
+                else:
+                    orientation_label = '03'
+            else:
+                if top_row_mean[1] > center[1]:
+                    orientation_label = '21'
+                else:
+                    orientation_label = '01'
+
         mean_colors = []
 
         sample_size = round(min(input_image.shape[:2]) * 0.01)
@@ -207,9 +239,9 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         grid_colors = mean_colors[4:]
 
         if first_turn_color[0] > first_turn_color[2]:
-            first_turn = 'b'
+            first_turn = 'blue'
         else:
-            first_turn = 'r'
+            first_turn = 'red'
 
         grid_assignments = [None] * 25
         color_darkness = [max(row) for row in grid_colors]
@@ -217,21 +249,30 @@ class BerkeleyImageProcessor(ImageProcessorInterface):
         color_redness = [row[2] - np.mean(row[0:2]) for row in grid_colors]
         filtered_color_redness = [el for i, el in enumerate(color_redness) if grid_assignments[i] is None]
         sorted_color_redness = sorted(filtered_color_redness, reverse=True)
-        for scr in sorted_color_redness[:9 if first_turn == 'r' else 8]:
+        for scr in sorted_color_redness[:9 if first_turn == 'red' else 8]:
             grid_assignments[color_redness.index(scr)] = 'r'
         color_blueness = [row[0] - np.mean(row[1:]) for row in grid_colors]
         filtered_color_blueness = [el for i, el in enumerate(color_blueness) if grid_assignments[i] is None]
         sorted_color_blueness = sorted(filtered_color_blueness, reverse=True)
-        for scb in sorted_color_blueness[:9 if first_turn == 'b' else 8]:
+        for scb in sorted_color_blueness[:9 if first_turn == 'blue' else 8]:
             grid_assignments[color_blueness.index(scb)] = 'b'
         for i in range(len(grid_assignments)):
             if grid_assignments[i] is None:
                 grid_assignments[i] = 'y'
 
-        for image_point, grid_assignment in zip(transformed_points[4:], grid_assignments):
-            cv2.circle(input_image, image_point, 8, (0, 255, 0), -1)
-            color = (0, 0, 0) if grid_assignment == 'k' else (0, 0, 255) if grid_assignment == 'r' else (255, 0, 0) if grid_assignment == 'b' else (183, 228, 249)
-            cv2.circle(input_image, image_point, 7, color, -1)
-
         if self.difficulty and self.background:
-            self._save_image(input_image, f'{self.background}{self.difficulty}detailed_prediction')
+            for image_point, grid_assignment in zip(transformed_points[4:], grid_assignments):
+                cv2.circle(input_image, image_point, 8, (0, 255, 0), -1)
+                color = (0, 0, 0) if grid_assignment == 'k' else (0, 0, 255) if grid_assignment == 'r' else (255, 0, 0) if grid_assignment == 'b' else (183, 228, 249)
+                cv2.circle(input_image, image_point, 7, color, -1)
+            self._save_image(input_image, f'{self.background}{self.difficulty}prediction')
+
+        results_array = np.array(grid_assignments).reshape((5, 5))
+        if orientation_label in {'10', '13', '30', '32'}:
+            results_array = transpose(results_array)
+        if orientation_label in {'03', '23', '30', '31'}:
+            results_array = x_flip(results_array)
+        if orientation_label in {'12', '21', '23', '32'}:
+            results_array = y_flip(results_array)
+
+        return first_turn, results_array

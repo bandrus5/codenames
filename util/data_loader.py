@@ -35,6 +35,10 @@ def get_data(background: str = '*', difficulty: str = '*', dataset: str = 'valid
         with open(label_location) as label_file:
             game_state: GameState = json.load(label_file)
 
+        # If the image is rotated, rotate the key as well. NOTE: Maybe we should do this for the words?
+        if input_image.shape[0] > input_image.shape[1]:
+            game_state['key'] = np.flip(np.array(game_state['key']), axis=0).T.tolist()
+
         new_bundle: Bundle = {'image': input_image, 'name': image_name, 'label': game_state}
         data_bundles.append(new_bundle)
     return data_bundles
