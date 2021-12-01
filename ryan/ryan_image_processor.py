@@ -27,6 +27,9 @@ class RyanImageProcessor(ImageProcessorInterface):
     yellow_card_color = np.array([180, 210, 230])
     white_card_color = np.array([255, 255, 255])
 
+    def __init__(self, flags):
+        CardIdentifier.init(flags.tesseract_path)
+
     # yellow_card_color = np.array([0, 255, 255])
 
     def extract_state_from_image(self, input_image: Int2D_3C) -> Optional[GameState]:

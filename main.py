@@ -33,6 +33,10 @@ if __name__ == '__main__':
                         default='display',
                         help='Which analyzer to use for extracting game state from images')
 
+    parser.add_argument('-tp', '--tesseract_path',
+                        type=str,
+                        help='Filter dataset based on difficulty of images')
+
     parser.add_argument('-v', '--verbose',
                         action='store_true')
 
@@ -45,7 +49,7 @@ if __name__ == '__main__':
     if flags.processor.lower() == 'berkeley':
         image_processor = BerkeleyImageProcessor(flags=flags)
     elif flags.processor.lower() == 'ryan':
-        image_processor = RyanImageProcessor()
+        image_processor = RyanImageProcessor(flags=flags)
     elif flags.processor.lower() == 'duncan':
         image_processor = None
     else:

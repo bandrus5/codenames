@@ -127,6 +127,11 @@ def east_detect(image):
 
 class CardIdentifier:
     @staticmethod
+    def init(tesseract_path):
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+
+    @staticmethod
     def identify_card(card_img: Int2D_3C, red_color: Color, blue_color: Color, yellow_color: Color) -> str:
         red_distance = ColorExtractor.distance_from_color(card_img, red_color)
         blue_distance = ColorExtractor.distance_from_color(card_img, blue_color)
