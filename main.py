@@ -3,6 +3,7 @@ import util.image_functions
 from util.image_functions import display_image
 from ryan.ryan_image_processor import RyanImageProcessor
 from berkeley.berkeley_image_processor import BerkeleyImageProcessor
+from codenames_image_processsor import CodenamesImageProcessor
 import colorama
 import argparse
 
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-p', '--processor',
                         type=str,
-                        choices=['berkeley', 'ryan', 'duncan', 'display'],
+                        choices=['berkeley', 'ryan', 'duncan', 'display', 'codenames'],
                         default='display',
                         help='Which analyzer to use for extracting game state from images')
 
@@ -52,6 +53,8 @@ if __name__ == '__main__':
         image_processor = RyanImageProcessor(flags=flags)
     elif flags.processor.lower() == 'duncan':
         image_processor = None
+    elif flags.processor.lower() == 'codenames':
+        image_processor = CodenamesImageProcessor(flags=flags)
     else:
         image_processor = None
 

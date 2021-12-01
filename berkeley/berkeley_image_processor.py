@@ -14,14 +14,12 @@ def homogeneous_to_cartesian(point):
     return (round(point[0]), round(point[1]))
 
 class BerkeleyImageProcessor(ImageProcessorInterface):
-
     def __init__(self, flags=None):
+        self.difficulty = None
+        self.background = None
         if flags:
-            try:
-                self.difficulty = int(flags.difficulty)
-                self.background = int(flags.background)
-            except:
-                pass
+            self.difficulty = flags.difficulty
+            self.background = flags.background
         self.kernel = np.ones((5,5),np.uint8)
         self.key_card_prototype = [(30, 197), (364, 197), (197, 364), (197, 30)] + [(row, col) for row in [305, 251, 197, 144, 90] for col in [90, 144, 197, 251, 305]]
 
