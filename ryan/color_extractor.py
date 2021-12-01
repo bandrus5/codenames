@@ -2,6 +2,7 @@ import numpy as np
 from cv2 import cv2
 import numpy.typing as npt
 from util.type_defs import *
+from util.image_functions import verbose_display, verbose_save
 
 
 class ColorExtractor:
@@ -28,7 +29,7 @@ class ColorExtractor:
     def extract_color(input_img: Int2D_3C, color: Color, threshold: int, use_only_value: bool = False) -> Int2D_1C:
         distance_img = ColorExtractor.distance_from_color(input_img, color, use_only_value)
         distance_img = (distance_img * 255).astype(np.uint8)
-        cv2.imwrite(f"viz/04_distance{color}.png", distance_img)
+        verbose_save(f"distance", distance_img, name_suffix=str(color))
         # self.verbose_display([distance_img, median_distance_img, input_img])
         # return distance_img
         if use_only_value:
@@ -37,7 +38,7 @@ class ColorExtractor:
             threshold_type = cv2.THRESH_BINARY
         _, threshold_img = cv2.threshold(distance_img, threshold, 255, threshold_type)
         # self.verbose_display([threshold_img, input_img])
-        cv2.imwrite(f"viz/05_threshold{color}.png", threshold_img)
+        verbose_save(f"threshold", threshold_img, name_suffix=str(color))
         return threshold_img
 
     @staticmethod

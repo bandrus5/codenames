@@ -33,13 +33,12 @@ class RyanImageProcessor(ImageProcessorInterface):
     # yellow_card_color = np.array([0, 255, 255])
 
     def extract_state_from_image(self, input_image: Int2D_3C) -> Optional[GameState]:
-        os.makedirs("viz", exist_ok=True)
-        cv2.imwrite("viz/01_input.png", input_image)
+        verbose_save("input", input_image, is_first_save=True)
         resized_size = 1000
         resized_img = resize_image(input_image, width=resized_size, height=resized_size)
-        cv2.imwrite("viz/02_resized.png", resized_img)
+        verbose_save("resized", resized_img)
         blurred_img = cv2.GaussianBlur(resized_img, (23, 23), 0)
-        cv2.imwrite("viz/03_blurred.png", blurred_img)
+        verbose_save("blurred", blurred_img)
         # mask, masked_img = ForegroundExtractor.extract_foreground(blurred_img, 20)
         # mask = None
         # masked_img = blurred_img
@@ -54,7 +53,7 @@ class RyanImageProcessor(ImageProcessorInterface):
         verbose_display([red_img, blue_img, yellow_img, balanced_img], 512)
 
         threshold_img = cv2.bitwise_or(yellow_img, blue_img)
-        cv2.imwrite("viz/06_combined.png", threshold_img)
+        verbose_save("combined", threshold_img)
         # card_group_contours, card_group_stats = CardContourExtractor.extract_card_contours(threshold_img, resized_img)
         cards_quads = CardGridRecognizer.get_cards_quads(threshold_img, resized_img)
         refined_cards_quads = CardQuadRefiner.refine_cards_quads(cards_quads, resized_img)
@@ -72,7 +71,7 @@ class RyanImageProcessor(ImageProcessorInterface):
             cropped_card = cv2.copyMakeBorder(cropped_card, 10, 10, 10, 10, borderType=cv2.BORDER_CONSTANT, value=(255, 255, 255))
             bordered_cards.append(cropped_card)
         combined_img = verbose_display(bordered_cards,display_size=100)
-        cv2.imwrite("viz/16_cards.png", combined_img)
+        verbose_save("cards", combined_img)
 
     def _filter_color(self, color_img: Int2D_1C, original_img: Int2D_3C):
         erode_img = cv2.erode(color_img, None, iterations=3)

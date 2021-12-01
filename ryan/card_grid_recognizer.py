@@ -1,6 +1,6 @@
 from cv2 import cv2
 from util.type_defs import *
-from util.image_functions import verbose_display
+from util.image_functions import verbose_display, verbose_save
 from util.image_functions import draw_hough_line_segments
 from ryan.card_contour_extractor import CardContourExtractor
 from scipy.optimize import minimize
@@ -28,7 +28,7 @@ class CardGridRecognizer:
         for i, card in enumerate(cards_quads):
             point = CardGridRecognizer._point_between_quad(card, 0.5, 0.2)
             cv2.putText(draw_img, str(i), point, cv2.FONT_HERSHEY_PLAIN, 3, color=(0, 0, 255), thickness=6)
-        cv2.imwrite("viz/10_grid.png", draw_img)
+        verbose_save("grid", draw_img)
         verbose_display(draw_img)
         return cards_quads
 
@@ -65,18 +65,18 @@ class CardGridRecognizer:
     def _find_grid_quad(threshold_img: Int2D_1C, original_img: Int2D_3C) -> Contour:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         threshold_img1 = cv2.dilate(threshold_img, kernel, iterations=30, borderType=cv2.BORDER_CONSTANT, borderValue=0)
-        cv2.imwrite("viz/07_dilate.png", threshold_img1)
+        verbose_save("dilate", threshold_img1)
         threshold_img2 = cv2.erode(threshold_img1, kernel, iterations=60, borderType=cv2.BORDER_CONSTANT, borderValue=0)
         threshold_img3 = cv2.dilate(threshold_img2, kernel, iterations=30, borderType=cv2.BORDER_CONSTANT,
                                     borderValue=0)
-        cv2.imwrite("viz/07_erode.png", threshold_img3)
+        verbose_save("erode", threshold_img3)
         grid_quad, contours = CardGridRecognizer.find_largest_quad(threshold_img3, original_img)
 
         contour_img = CardContourExtractor.display_contours(original_img, contours, return_result=True, thickness=10)
-        cv2.imwrite("viz/08_contour.png", contour_img)
+        verbose_save("contour", contour_img)
         simplified_contour_img = CardContourExtractor.display_contours(original_img, [grid_quad],
                                                                        return_result=True, thickness=10)
-        cv2.imwrite("viz/09_simplified.png", simplified_contour_img)
+        verbose_save("simplified", simplified_contour_img)
         combined_img = verbose_display(
             [threshold_img, threshold_img1, threshold_img2, threshold_img3, contour_img, simplified_contour_img],
             display_size=400)

@@ -128,7 +128,8 @@ def east_detect(image):
 class CardIdentifier:
     @staticmethod
     def init(tesseract_path):
-        pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        if tesseract_path is not None and tesseract_path != "":
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
     @staticmethod

@@ -6,6 +6,9 @@ from util.type_defs import *
 from matplotlib import pyplot as plt
 
 is_verbose = False
+is_verbose_save = False
+verbose_save_index = 0
+verbose_save_seen_names = dict()
 
 
 def _calculate_final_size(
@@ -85,6 +88,23 @@ def display_image(image: np.ndarray, width: int = 600, height: int = 600):
     cv2.imshow("image", sized_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def verbose_save(name: str, image: List[Union[Int2D_1C, Int2D_3C, Float2D_3C, Float2D_1C]], name_suffix: str = "", is_first_save: bool = False):
+    global verbose_save_index
+    global verbose_save_seen_names
+    if is_first_save:
+        os.makedirs("viz", exist_ok=True)
+        verbose_save_index = 0
+        verbose_save_seen_names.clear()
+    if is_verbose_save:
+        if name not in verbose_save_seen_names:
+            verbose_save_index += 1
+            verbose_save_seen_names[name] = verbose_save_index
+        index = verbose_save_seen_names[name]
+        cv2.imwrite(f"viz/{index:03d}_{name}{name_suffix}.png", image)
+
+
 
 
 def verbose_display(

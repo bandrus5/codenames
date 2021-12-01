@@ -1,6 +1,6 @@
 from cv2 import cv2
 import numpy as np
-from util.image_functions import verbose_display
+from util.image_functions import verbose_display, verbose_save
 from ryan.card_contour_extractor import CardContourExtractor
 from ryan.card_grid_recognizer import CardGridRecognizer
 from util.type_defs import *
@@ -37,7 +37,7 @@ class CardQuadRefiner:
     def refine_card_quad(card_quad: Contour, input_img: Int2D_3C) -> Contour:
         initial_quad_img = CardContourExtractor.display_contours(input_img.copy(), [card_quad], return_result=True,
                                                                  thickness=10, color=(0, 255, 0))
-        cv2.imwrite("viz/12_card_quad.png", initial_quad_img)
+        verbose_save("card_quad", initial_quad_img)
 
         mask_img = CardQuadRefiner._create_initial_mask(card_quad, input_img.shape[:2])
         # refined_mask_img = CardQuadRefiner.grab_cut(mask_img, input_img)
@@ -59,9 +59,9 @@ class CardQuadRefiner:
         display_mask_img = np.stack([np.zeros(mask_img.shape), np.zeros(mask_img.shape), mask_img * 85],
                                     axis=2).astype(np.uint8)
         display_mask_img = cv2.addWeighted(display_mask_img, 0.5, input_img, 0.5, 1)
-        cv2.imwrite("viz/13_markers.png", display_mask_img)
-        cv2.imwrite("viz/14_refined_mask.png", refined_mask_img * 255)
-        cv2.imwrite("viz/15_refined_quad.png", refined_quad_img)
+        verbose_save("markers", display_mask_img)
+        verbose_save("refined_mask", refined_mask_img * 255)
+        verbose_save("refined_quad", refined_quad_img)
         verbose_display([display_mask_img, refined_mask_img * 127, refined_quad_img])
         return accepted_quad
 
