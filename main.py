@@ -72,5 +72,6 @@ if __name__ == '__main__':
         print('---Expected Game State---')
         print_game_state(image_bundle['label'])
         print('---Predicted Game State---')
-        print_game_state(game_state)
+        game_state_differences = find_game_state_differences(image_bundle['label'], game_state)
+        print_game_state(game_state, game_state_differences)
         # display_image(image_bundle['image'], 1000, 1000)
