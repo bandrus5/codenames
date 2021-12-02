@@ -12,7 +12,9 @@ class CodenamesImageProcessor(ImageProcessorInterface):
 
     def extract_state_from_image(self, input_image: Int2D_3C) -> Optional[GameState]:
         card_grid_state = self.card_grid_processor.extract_state_from_image(input_image)
+        print("Extracting keycard state...")
         key_card_state = self.key_card_processor.extract_state_from_image(input_image)
+        print("Keycard state extracted")
         total_game_state = GameState(
             cards=card_grid_state.get(CARDS),
             key=key_card_state.get(KEY),

@@ -62,7 +62,7 @@ class CardQuadRefiner:
         verbose_save("markers", display_mask_img)
         verbose_save("refined_mask", refined_mask_img * 255)
         verbose_save("refined_quad", refined_quad_img)
-        verbose_display([display_mask_img, refined_mask_img * 127, refined_quad_img])
+        # verbose_display([display_mask_img, refined_mask_img * 127, refined_quad_img])
         return accepted_quad
 
     @staticmethod
